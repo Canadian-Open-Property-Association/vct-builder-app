@@ -70,7 +70,7 @@ export default function SaveToRepoModal({ isOpen, onClose }: SaveToRepoModalProp
       <div className="bg-white rounded-lg shadow-xl w-[500px] max-h-[80vh] overflow-y-auto">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Save to Repository</h3>
+            <h3 className="text-lg font-semibold">Create Pull Request</h3>
             <button
               onClick={handleClose}
               className="text-gray-500 hover:text-gray-700"

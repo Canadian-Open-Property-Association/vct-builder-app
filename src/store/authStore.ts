@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface GitHubUser {
+export interface GitHubUser {
   id: number;
   login: string;
   name: string | null;
@@ -18,6 +18,11 @@ interface AuthState {
   logout: () => Promise<void>;
   clearError: () => void;
 }
+
+// Get current user ID for storage key (exported for vctStore)
+export const getCurrentUserId = (): string | null => {
+  return useAuthStore.getState().user?.id.toString() || null;
+};
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
@@ -37,8 +42,14 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       if (data.authenticated) {
         set({ user: data.user, isAuthenticated: true, isLoading: false });
+        // Reload user-specific projects after auth check
+        const { reloadUserProjects } = await import('./vctStore');
+        reloadUserProjects();
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
+        // Load anonymous projects
+        const { reloadUserProjects } = await import('./vctStore');
+        reloadUserProjects();
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -58,6 +69,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         credentials: 'include',
       });
       set({ user: null, isAuthenticated: false });
+      // Reload to anonymous projects
+      const { reloadUserProjects } = await import('./vctStore');
+      reloadUserProjects();
     } catch (error) {
       console.error('Logout failed:', error);
     }

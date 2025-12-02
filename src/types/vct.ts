@@ -106,6 +106,7 @@ export interface VCTStore {
   sampleData: SampleData;
   currentProjectId: string | null;
   currentProjectName: string;
+  isDirty: boolean;
 
   // Saved projects
   savedProjects: SavedProject[];
@@ -115,6 +116,7 @@ export interface VCTStore {
   updateVctField: <K extends keyof VCT>(field: K, value: VCT[K]) => void;
   setSampleData: (data: SampleData) => void;
   updateSampleDataField: (path: string, value: string) => void;
+  updateProjectName: (name: string) => void;
 
   // Display actions
   addDisplay: (locale: string) => void;

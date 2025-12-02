@@ -1,28 +1,29 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useVctStore } from '../../store/vctStore';
 import { useAuthStore } from '../../store/authStore';
 import LoginButton from '../Auth/LoginButton';
-import VctLibrary from '../Library/VctLibrary';
+import ImportModal from '../Modals/ImportModal';
 import SaveToRepoModal from '../Library/SaveToRepoModal';
 
 export default function Toolbar() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [showLoadDialog, setShowLoadDialog] = useState(false);
-  const [showLibrary, setShowLibrary] = useState(false);
+  const [showLocalLibrary, setShowLocalLibrary] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [showSaveToRepo, setShowSaveToRepo] = useState(false);
   const [projectName, setProjectName] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const currentProjectName = useVctStore((state) => state.currentProjectName);
   const savedProjects = useVctStore((state) => state.savedProjects);
+  const isDirty = useVctStore((state) => state.isDirty);
   const newProject = useVctStore((state) => state.newProject);
   const saveProject = useVctStore((state) => state.saveProject);
   const loadProject = useVctStore((state) => state.loadProject);
   const deleteProject = useVctStore((state) => state.deleteProject);
   const exportVct = useVctStore((state) => state.exportVct);
-  const importVct = useVctStore((state) => state.importVct);
+  const updateProjectName = useVctStore((state) => state.updateProjectName);
 
   const handleSave = () => {
     setProjectName(currentProjectName);
@@ -49,33 +50,21 @@ export default function Toolbar() {
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const json = event.target?.result as string;
-          importVct(json);
-        } catch (error) {
-          alert('Failed to import VCT file. Please check the file format.');
-        }
-      };
-      reader.readAsText(file);
+  const handleNew = () => {
+    if (isDirty) {
+      if (confirm('You have unsaved changes. Are you sure you want to create a new project?')) {
+        newProject();
+      }
+    } else {
+      newProject();
     }
-    // Reset input
-    e.target.value = '';
   };
 
   return (
     <>
       <div className="bg-white border-b border-gray-200 px-6 py-2 flex items-center gap-2">
         <button
-          onClick={() => newProject()}
+          onClick={handleNew}
           className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-1"
         >
           <span>📄</span> New
@@ -87,14 +76,17 @@ export default function Toolbar() {
           <span>💾</span> Save
         </button>
         <button
-          onClick={() => setShowLoadDialog(true)}
+          onClick={() => setShowLocalLibrary(true)}
           className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-1"
         >
-          <span>📂</span> Load
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          Local Library
         </button>
         <div className="w-px h-6 bg-gray-300 mx-2" />
         <button
-          onClick={handleImport}
+          onClick={() => setShowImportModal(true)}
           className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-1"
         >
           <span>📥</span> Import JSON
@@ -111,39 +103,31 @@ export default function Toolbar() {
           <>
             <div className="w-px h-6 bg-gray-300 mx-2" />
             <button
-              onClick={() => setShowLibrary(true)}
-              className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-1"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              Library
-            </button>
-            <button
               onClick={() => setShowSaveToRepo(true)}
               className="px-3 py-1.5 text-sm bg-green-600 text-white hover:bg-green-700 rounded-md flex items-center gap-1"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
               </svg>
-              Save to Repo
+              Create Pull Request
             </button>
           </>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* Project Title */}
+        <div className="flex-1 flex justify-center">
+          <input
+            type="text"
+            value={currentProjectName}
+            onChange={(e) => updateProjectName(e.target.value)}
+            className="text-sm font-medium text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-2 py-1 text-center min-w-[150px]"
+            placeholder="Project name"
+          />
+          {isDirty && <span className="text-gray-400 ml-1">*</span>}
+        </div>
 
         {/* Login Button */}
         <LoginButton />
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          onChange={handleFileChange}
-          className="hidden"
-        />
       </div>
 
       {/* Save Dialog */}
@@ -177,52 +161,97 @@ export default function Toolbar() {
         </div>
       )}
 
-      {/* Load Dialog */}
-      {showLoadDialog && (
+      {/* Local Library Dialog */}
+      {showLocalLibrary && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Load Project</h3>
-            {savedProjects.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">
-                No saved projects yet
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {savedProjects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    <div
-                      className="flex-1 cursor-pointer"
-                      onClick={() => {
-                        loadProject(project.id);
-                        setShowLoadDialog(false);
-                      }}
-                    >
-                      <p className="font-medium">{project.name}</p>
-                      <p className="text-xs text-gray-500">
-                        Updated: {new Date(project.updatedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete "${project.name}"?`)) {
-                          deleteProject(project.id);
-                        }
-                      }}
-                      className="text-red-500 hover:text-red-700 p-1"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                ))}
+          <div className="bg-white rounded-lg shadow-xl w-[500px] max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Local Library</h3>
+                <button
+                  onClick={() => setShowLocalLibrary(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-            )}
-            <div className="flex justify-end mt-4">
+              <p className="text-sm text-gray-500 mt-1">Your locally saved VCT projects</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {savedProjects.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <p className="mb-2">No saved projects yet</p>
+                  <p className="text-sm">Create a VCT and click Save to add it to your library.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {savedProjects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    >
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() => {
+                          if (isDirty) {
+                            if (confirm('You have unsaved changes. Load this project anyway?')) {
+                              loadProject(project.id);
+                              setShowLocalLibrary(false);
+                            }
+                          } else {
+                            loadProject(project.id);
+                            setShowLocalLibrary(false);
+                          }
+                        }}
+                      >
+                        <p className="font-medium">{project.name}</p>
+                        <p className="text-xs text-gray-500">
+                          Updated: {new Date(project.updatedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {deleteConfirm === project.id ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              deleteProject(project.id);
+                              setDeleteConfirm(null);
+                            }}
+                            className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            className="text-xs px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirm(project.id)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                          title="Delete project"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
               <button
-                onClick={() => setShowLoadDialog(false)}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md"
+                onClick={() => setShowLocalLibrary(false)}
+                className="w-full px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-md"
               >
                 Close
               </button>
@@ -231,10 +260,10 @@ export default function Toolbar() {
         </div>
       )}
 
-      {/* VCT Library Modal */}
-      <VctLibrary isOpen={showLibrary} onClose={() => setShowLibrary(false)} />
+      {/* Import Modal */}
+      <ImportModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} />
 
-      {/* Save to Repo Modal */}
+      {/* Create Pull Request Modal */}
       <SaveToRepoModal isOpen={showSaveToRepo} onClose={() => setShowSaveToRepo(false)} />
     </>
   );

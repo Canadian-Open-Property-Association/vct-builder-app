@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import {
   VCT,
   VCTDisplay,
@@ -12,8 +12,31 @@ import {
   VCTStore,
   createDefaultVct,
 } from '../types/vct';
+import { getCurrentUserId } from './authStore';
 
 const generateId = () => crypto.randomUUID();
+
+// Get storage key based on current user
+const getStorageKey = () => {
+  const userId = getCurrentUserId();
+  return `vct-builder-storage-${userId || 'anonymous'}`;
+};
+
+// Custom storage that uses user-specific keys
+const userStorage: StateStorage = {
+  getItem: (_name: string): string | null => {
+    const key = getStorageKey();
+    return localStorage.getItem(key);
+  },
+  setItem: (_name: string, value: string): void => {
+    const key = getStorageKey();
+    localStorage.setItem(key, value);
+  },
+  removeItem: (_name: string): void => {
+    const key = getStorageKey();
+    localStorage.removeItem(key);
+  },
+};
 
 // Legacy type for imported VCTs with old field names
 interface LegacyRendering {
@@ -68,23 +91,28 @@ export const useVctStore = create<VCTStore>()(
       sampleData: {},
       currentProjectId: null,
       currentProjectName: 'Untitled',
+      isDirty: false,
       savedProjects: [],
 
       // VCT actions
-      setVct: (vct: VCT) => set({ currentVct: normalizeVct(vct) }),
+      setVct: (vct: VCT) => set({ currentVct: normalizeVct(vct), isDirty: true }),
 
       updateVctField: <K extends keyof VCT>(field: K, value: VCT[K]) =>
         set((state) => ({
           currentVct: { ...state.currentVct, [field]: value },
+          isDirty: true,
         })),
 
       // Sample data actions
-      setSampleData: (data: SampleData) => set({ sampleData: data }),
+      setSampleData: (data: SampleData) => set({ sampleData: data, isDirty: true }),
 
       updateSampleDataField: (path: string, value: string) =>
         set((state) => ({
           sampleData: { ...state.sampleData, [path]: value },
+          isDirty: true,
         })),
+
+      updateProjectName: (name: string) => set({ currentProjectName: name, isDirty: true }),
 
       // Display actions
       addDisplay: (locale: string) =>
@@ -122,6 +150,7 @@ export const useVctStore = create<VCTStore>()(
           });
           return {
             currentVct: { ...newVct, claims: updatedClaims },
+            isDirty: true,
           };
         }),
 
@@ -131,6 +160,7 @@ export const useVctStore = create<VCTStore>()(
           newDisplay[index] = { ...newDisplay[index], ...displayUpdate };
           return {
             currentVct: { ...state.currentVct, display: newDisplay },
+            isDirty: true,
           };
         }),
 
@@ -149,6 +179,7 @@ export const useVctStore = create<VCTStore>()(
               display: newDisplay,
               claims: updatedClaims,
             },
+            isDirty: true,
           };
         }),
 
@@ -172,6 +203,7 @@ export const useVctStore = create<VCTStore>()(
                 },
               ],
             },
+            isDirty: true,
           };
         }),
 
@@ -181,6 +213,7 @@ export const useVctStore = create<VCTStore>()(
           newClaims[index] = { ...newClaims[index], ...claimUpdate };
           return {
             currentVct: { ...state.currentVct, claims: newClaims },
+            isDirty: true,
           };
         }),
 
@@ -190,6 +223,7 @@ export const useVctStore = create<VCTStore>()(
             ...state.currentVct,
             claims: state.currentVct.claims.filter((_, i) => i !== index),
           },
+          isDirty: true,
         })),
 
       // Sync claim locales with display locales
@@ -234,6 +268,7 @@ export const useVctStore = create<VCTStore>()(
           sampleData: {},
           currentProjectId: null,
           currentProjectName: 'Untitled',
+          isDirty: false,
         }),
 
       saveProject: (name: string) => {
@@ -244,6 +279,7 @@ export const useVctStore = create<VCTStore>()(
           // Update existing project
           set((s) => ({
             currentProjectName: name,
+            isDirty: false,
             savedProjects: s.savedProjects.map((p) =>
               p.id === state.currentProjectId
                 ? {
@@ -270,6 +306,7 @@ export const useVctStore = create<VCTStore>()(
           set((s) => ({
             currentProjectId: id,
             currentProjectName: name,
+            isDirty: false,
             savedProjects: [...s.savedProjects, newProject],
           }));
         }
@@ -283,6 +320,7 @@ export const useVctStore = create<VCTStore>()(
             sampleData: project.sampleData,
             currentProjectId: project.id,
             currentProjectName: project.name,
+            isDirty: false,
           });
         }
       },
@@ -311,6 +349,7 @@ export const useVctStore = create<VCTStore>()(
             currentVct: normalizeVct(vct),
             currentProjectId: null,
             currentProjectName: 'Imported',
+            isDirty: true,
           });
         } catch (e) {
           console.error('Failed to import VCT:', e);
@@ -320,9 +359,29 @@ export const useVctStore = create<VCTStore>()(
     }),
     {
       name: 'vct-builder-storage',
+      storage: createJSONStorage(() => userStorage),
       partialize: (state) => ({
         savedProjects: state.savedProjects,
       }),
     }
   )
 );
+
+// Function to reload store data when user changes (call after login/logout)
+export const reloadUserProjects = () => {
+  const key = getStorageKey();
+  const stored = localStorage.getItem(key);
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      if (data.state?.savedProjects) {
+        useVctStore.setState({ savedProjects: data.state.savedProjects });
+      }
+    } catch (e) {
+      console.error('Failed to load user projects:', e);
+    }
+  } else {
+    // No saved projects for this user
+    useVctStore.setState({ savedProjects: [] });
+  }
+};
