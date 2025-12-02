@@ -12,5 +12,6 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    allowedHosts: ['vct-builder-app.onrender.com'],
   },
 })
