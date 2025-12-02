@@ -10,10 +10,14 @@ RUN npm install
 
 COPY . .
 
-# Expose Vite dev server and proxy server ports
-EXPOSE 5173 5174
+# Build the frontend for production
+RUN npm run build
+
+# Expose the server port (Render uses PORT env var)
+EXPOSE 5174
 
 # Volume for persistent asset storage
 VOLUME ["/app/assets"]
 
-CMD ["npm", "run", "dev"]
+# Run production server
+CMD ["npm", "run", "start"]

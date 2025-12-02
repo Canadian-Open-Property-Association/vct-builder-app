@@ -102,8 +102,14 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 app.use('/api/github', githubRouter);
 
-// Serve static assets
+// Serve static assets (uploaded files)
 app.use('/assets', express.static(ASSETS_DIR));
+
+// Serve frontend static files in production
+if (isProduction) {
+  const distPath = path.join(__dirname, '../dist');
+  app.use(express.static(distPath));
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -254,9 +260,16 @@ app.get('/hash', async (req, res) => {
   }
 });
 
+// SPA fallback - serve index.html for all non-API routes in production
+if (isProduction) {
+  const distPath = path.join(__dirname, '../dist');
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
 app.listen(PORT, () => {
-  console.log(`VCT Builder proxy server running on http://localhost:${PORT}`);
+  console.log(`VCT Builder server running on port ${PORT}`);
+  console.log(`Environment: ${isProduction ? 'production' : 'development'}`);
   console.log(`Assets directory: ${ASSETS_DIR}`);
-  console.log(`Hash endpoint: http://localhost:${PORT}/hash?url=<resource-url>`);
-  console.log(`Assets API: http://localhost:${PORT}/api/assets`);
 });
