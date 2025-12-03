@@ -417,12 +417,7 @@ export default function CredentialPreview({ locale, mode, cardSide }: Credential
           height: '214px',
         }}
       >
-        {/* Network Mark */}
-        <div className="p-3 text-center text-sm font-semibold border-b border-white/20">
-          ◆ CORNERSTONE
-        </div>
-
-        {/* Metadata Section */}
+          {/* Metadata Section */}
         {metadata && metadata.fields.length > 0 && (
           <div className="px-4 py-2 text-xs space-y-1">
             {metadata.fields.map((fieldId) => {
@@ -466,16 +461,6 @@ export default function CredentialPreview({ locale, mode, cardSide }: Credential
                   )}
                 </div>
               ))}
-            </div>
-            <div className="mt-2 text-xs space-y-0.5">
-              {evidence.sources.slice(0, 3).map((source) => (
-                <p key={source.id} className="opacity-75 truncate">
-                  • {source.display} - {source.description}
-                </p>
-              ))}
-              {evidence.sources.length > 3 && (
-                <p className="opacity-50">+{evidence.sources.length - 3} more</p>
-              )}
             </div>
           </div>
         )}
