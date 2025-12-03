@@ -31,7 +31,21 @@ const ASSETS_META_FILE = path.join(ASSETS_DIR, 'metadata.json');
 const loadAssetsMeta = () => {
   try {
     if (fs.existsSync(ASSETS_META_FILE)) {
-      return JSON.parse(fs.readFileSync(ASSETS_META_FILE, 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(ASSETS_META_FILE, 'utf-8'));
+      // Migrate any old absolute URLs to relative paths
+      let needsSave = false;
+      meta.assets = meta.assets.map(asset => {
+        if (asset.uri && asset.uri.includes('://')) {
+          // Convert absolute URL to relative path
+          asset.uri = `/assets/${asset.filename}`;
+          needsSave = true;
+        }
+        return asset;
+      });
+      if (needsSave) {
+        fs.writeFileSync(ASSETS_META_FILE, JSON.stringify(meta, null, 2));
+      }
+      return meta;
     }
   } catch (e) {
     console.error('Error loading assets metadata:', e);
@@ -148,7 +162,7 @@ app.post('/api/assets', upload.single('file'), async (req, res) => {
       mimetype,
       size,
       hash: integrityHash,
-      uri: `http://localhost:${PORT}/assets/${filename}`,
+      uri: `/assets/${filename}`, // Use relative path so it works on any deployment
       createdAt: new Date().toISOString(),
     };
 
