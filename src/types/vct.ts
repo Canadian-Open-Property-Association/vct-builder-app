@@ -216,9 +216,9 @@ export interface VCTStore {
 
   // Project actions
   newProject: () => void;
-  saveProject: (name: string) => void;
+  saveProject: (name: string) => Promise<void>;
   loadProject: (id: string) => void;
-  deleteProject: (id: string) => void;
+  deleteProject: (id: string) => Promise<void>;
 
   // Import/Export
   exportVct: () => string;

@@ -20,9 +20,17 @@ const isProduction = process.env.NODE_ENV === 'production';
 // In production, mount a persistent disk and set ASSETS_PATH=/var/data/assets
 const ASSETS_DIR = process.env.ASSETS_PATH || path.join(__dirname, '../assets');
 
+// VCT Projects directory (stored alongside assets on persistent disk)
+const PROJECTS_DIR = path.join(ASSETS_DIR, 'projects');
+
 // Ensure assets directory exists
 if (!fs.existsSync(ASSETS_DIR)) {
   fs.mkdirSync(ASSETS_DIR, { recursive: true });
+}
+
+// Ensure projects directory exists
+if (!fs.existsSync(PROJECTS_DIR)) {
+  fs.mkdirSync(PROJECTS_DIR, { recursive: true });
 }
 
 // Assets metadata file
@@ -249,6 +257,160 @@ app.patch('/api/assets/:id', (req, res) => {
     res.json(asset);
   } catch (error) {
     console.error('Error updating asset:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// VCT Projects API (per-user server storage)
+// ============================================
+
+// Helper: Get user's projects file path
+const getUserProjectsFile = (userId) => {
+  return path.join(PROJECTS_DIR, `user-${userId}.json`);
+};
+
+// Helper: Load user's projects
+const loadUserProjects = (userId) => {
+  const filePath = getUserProjectsFile(userId);
+  try {
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    }
+  } catch (e) {
+    console.error(`Error loading projects for user ${userId}:`, e);
+  }
+  return { projects: [] };
+};
+
+// Helper: Save user's projects
+const saveUserProjects = (userId, data) => {
+  const filePath = getUserProjectsFile(userId);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+};
+
+// Middleware: Require authentication for projects
+const requireProjectAuth = (req, res, next) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  next();
+};
+
+// List all projects for current user
+app.get('/api/projects', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const data = loadUserProjects(userId);
+    res.json(data.projects);
+  } catch (error) {
+    console.error('Error listing projects:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get a specific project
+app.get('/api/projects/:id', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id } = req.params;
+    const data = loadUserProjects(userId);
+    const project = data.projects.find(p => p.id === id);
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    res.json(project);
+  } catch (error) {
+    console.error('Error getting project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create a new project
+app.post('/api/projects', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id, name, vct, sampleData } = req.body;
+
+    if (!id || !name || !vct) {
+      return res.status(400).json({ error: 'id, name, and vct are required' });
+    }
+
+    const data = loadUserProjects(userId);
+    const now = new Date().toISOString();
+
+    const newProject = {
+      id,
+      name,
+      vct,
+      sampleData: sampleData || {},
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    data.projects.push(newProject);
+    saveUserProjects(userId, data);
+
+    res.json(newProject);
+  } catch (error) {
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update an existing project
+app.put('/api/projects/:id', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id } = req.params;
+    const { name, vct, sampleData } = req.body;
+
+    const data = loadUserProjects(userId);
+    const projectIndex = data.projects.findIndex(p => p.id === id);
+
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const updatedProject = {
+      ...data.projects[projectIndex],
+      name: name ?? data.projects[projectIndex].name,
+      vct: vct ?? data.projects[projectIndex].vct,
+      sampleData: sampleData ?? data.projects[projectIndex].sampleData,
+      updatedAt: new Date().toISOString(),
+    };
+
+    data.projects[projectIndex] = updatedProject;
+    saveUserProjects(userId, data);
+
+    res.json(updatedProject);
+  } catch (error) {
+    console.error('Error updating project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a project
+app.delete('/api/projects/:id', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id } = req.params;
+
+    const data = loadUserProjects(userId);
+    const projectIndex = data.projects.findIndex(p => p.id === id);
+
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    data.projects.splice(projectIndex, 1);
+    saveUserProjects(userId, data);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting project:', error);
     res.status(500).json({ error: error.message });
   }
 });

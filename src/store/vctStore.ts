@@ -18,17 +18,19 @@ import {
   createDefaultVct,
   isFrontBackFormat,
 } from '../types/vct';
-import { getCurrentUserId } from './authStore';
+import { getCurrentUserId, useAuthStore } from './authStore';
 
 const generateId = () => crypto.randomUUID();
 
-// Get storage key based on current user
+const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
+
+// Get storage key based on current user (for localStorage fallback)
 const getStorageKey = () => {
   const userId = getCurrentUserId();
   return `vct-builder-storage-${userId || 'anonymous'}`;
 };
 
-// Custom storage that uses user-specific keys
+// Custom storage that uses user-specific keys (fallback for anonymous users)
 const userStorage: StateStorage = {
   getItem: (_name: string): string | null => {
     const key = getStorageKey();
@@ -43,6 +45,53 @@ const userStorage: StateStorage = {
     localStorage.removeItem(key);
   },
 };
+
+// Server API helpers for authenticated users
+const projectsApi = {
+  async list(): Promise<SavedProject[]> {
+    const response = await fetch(`${API_BASE}/api/projects`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      if (response.status === 401) return [];
+      throw new Error('Failed to fetch projects');
+    }
+    return response.json();
+  },
+
+  async create(project: SavedProject): Promise<SavedProject> {
+    const response = await fetch(`${API_BASE}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(project),
+    });
+    if (!response.ok) throw new Error('Failed to create project');
+    return response.json();
+  },
+
+  async update(id: string, project: Partial<SavedProject>): Promise<SavedProject> {
+    const response = await fetch(`${API_BASE}/api/projects/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(project),
+    });
+    if (!response.ok) throw new Error('Failed to update project');
+    return response.json();
+  },
+
+  async delete(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/projects/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Failed to delete project');
+  },
+};
+
+// Check if user is authenticated
+const isAuthenticated = () => useAuthStore.getState().isAuthenticated;
 
 // Legacy type for imported VCTs with old field names
 interface LegacyRendering {
@@ -277,27 +326,38 @@ export const useVctStore = create<VCTStore>()(
           isDirty: false,
         }),
 
-      saveProject: (name: string) => {
+      saveProject: async (name: string) => {
         const state = get();
         const now = new Date().toISOString();
 
         if (state.currentProjectId) {
           // Update existing project
+          const updatedProject = {
+            name,
+            vct: state.currentVct,
+            sampleData: state.sampleData,
+            updatedAt: now,
+          };
+
+          // Update local state immediately
           set((s) => ({
             currentProjectName: name,
             isDirty: false,
             savedProjects: s.savedProjects.map((p) =>
               p.id === state.currentProjectId
-                ? {
-                    ...p,
-                    name,
-                    vct: state.currentVct,
-                    sampleData: state.sampleData,
-                    updatedAt: now,
-                  }
+                ? { ...p, ...updatedProject }
                 : p
             ),
           }));
+
+          // Sync to server if authenticated
+          if (isAuthenticated()) {
+            try {
+              await projectsApi.update(state.currentProjectId, updatedProject);
+            } catch (e) {
+              console.error('Failed to sync project update to server:', e);
+            }
+          }
         } else {
           // Create new project
           const id = generateId();
@@ -309,12 +369,23 @@ export const useVctStore = create<VCTStore>()(
             createdAt: now,
             updatedAt: now,
           };
+
+          // Update local state immediately
           set((s) => ({
             currentProjectId: id,
             currentProjectName: name,
             isDirty: false,
             savedProjects: [...s.savedProjects, newProject],
           }));
+
+          // Sync to server if authenticated
+          if (isAuthenticated()) {
+            try {
+              await projectsApi.create(newProject);
+            } catch (e) {
+              console.error('Failed to sync new project to server:', e);
+            }
+          }
         }
       },
 
@@ -331,7 +402,8 @@ export const useVctStore = create<VCTStore>()(
         }
       },
 
-      deleteProject: (id: string) =>
+      deleteProject: async (id: string) => {
+        // Update local state immediately
         set((state) => ({
           savedProjects: state.savedProjects.filter((p) => p.id !== id),
           ...(state.currentProjectId === id
@@ -340,7 +412,17 @@ export const useVctStore = create<VCTStore>()(
                 currentProjectName: 'Untitled',
               }
             : {}),
-        })),
+        }));
+
+        // Sync to server if authenticated
+        if (isAuthenticated()) {
+          try {
+            await projectsApi.delete(id);
+          } catch (e) {
+            console.error('Failed to sync project deletion to server:', e);
+          }
+        }
+      },
 
       // Import/Export
       exportVct: () => {
@@ -543,6 +625,7 @@ export const useVctStore = create<VCTStore>()(
       name: 'vct-builder-storage',
       storage: createJSONStorage(() => userStorage),
       partialize: (state) => ({
+        // Only persist savedProjects to localStorage (for anonymous users)
         savedProjects: state.savedProjects,
       }),
     }
@@ -550,7 +633,26 @@ export const useVctStore = create<VCTStore>()(
 );
 
 // Function to reload store data when user changes (call after login/logout)
-export const reloadUserProjects = () => {
+// For authenticated users, fetches from server; for anonymous, uses localStorage
+export const reloadUserProjects = async () => {
+  if (isAuthenticated()) {
+    // Fetch from server for authenticated users
+    try {
+      const projects = await projectsApi.list();
+      useVctStore.setState({ savedProjects: projects });
+    } catch (e) {
+      console.error('Failed to load projects from server:', e);
+      // Fall back to localStorage
+      loadFromLocalStorage();
+    }
+  } else {
+    // Use localStorage for anonymous users
+    loadFromLocalStorage();
+  }
+};
+
+// Helper to load from localStorage
+const loadFromLocalStorage = () => {
   const key = getStorageKey();
   const stored = localStorage.getItem(key);
   if (stored) {
@@ -560,7 +662,7 @@ export const reloadUserProjects = () => {
         useVctStore.setState({ savedProjects: data.state.savedProjects });
       }
     } catch (e) {
-      console.error('Failed to load user projects:', e);
+      console.error('Failed to load user projects from localStorage:', e);
     }
   } else {
     // No saved projects for this user
