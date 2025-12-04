@@ -6,7 +6,7 @@ const router = express.Router();
 // GitHub repo configuration
 const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'Canadian-Open-Property-Association';
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME || 'governance';
-const VCT_FOLDER_PATH = process.env.VCT_FOLDER_PATH || 'credentials/vct';
+const VCT_FOLDER_PATH = process.env.VCT_FOLDER_PATH || 'credentials/branding';
 const SCHEMA_FOLDER_PATH = process.env.SCHEMA_FOLDER_PATH || 'credentials/schemas';
 const BASE_URL = process.env.BASE_URL || 'https://openpropertyassociation.ca';
 // Base branch for PRs - if set, use this instead of repo's default branch
@@ -15,7 +15,7 @@ const GITHUB_BASE_BRANCH = process.env.GITHUB_BASE_BRANCH || null;
 // Get configuration (base URLs for VCT and Schema)
 router.get('/config', requireAuth, (req, res) => {
   res.json({
-    vctBaseUrl: `${BASE_URL}/credentials/vct/`,
+    vctBaseUrl: `${BASE_URL}/credentials/branding/`,
     schemaBaseUrl: `${BASE_URL}/credentials/schemas/`,
   });
 });
