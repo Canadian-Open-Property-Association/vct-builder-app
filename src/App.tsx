@@ -18,7 +18,7 @@ function App() {
           path="/apps"
           element={
             <AuthGuard>
-              <PlatformShell showBackButton={false}>
+              <PlatformShell>
                 <AppSelectionPage />
               </PlatformShell>
             </AuthGuard>
@@ -29,7 +29,7 @@ function App() {
           path="/apps/vct-builder/*"
           element={
             <AuthGuard>
-              <PlatformShell showBackButton={true}>
+              <PlatformShell>
                 <VctBuilderApp />
               </PlatformShell>
             </AuthGuard>
@@ -40,7 +40,7 @@ function App() {
           path="/apps/schema-builder/*"
           element={
             <AuthGuard>
-              <PlatformShell showBackButton={true}>
+              <PlatformShell>
                 <SchemaBuilderApp />
               </PlatformShell>
             </AuthGuard>

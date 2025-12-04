@@ -2,13 +2,12 @@ import PlatformBar from './PlatformBar';
 
 interface PlatformShellProps {
   children: React.ReactNode;
-  showBackButton?: boolean;
 }
 
-export default function PlatformShell({ children, showBackButton = true }: PlatformShellProps) {
+export default function PlatformShell({ children }: PlatformShellProps) {
   return (
     <div className="flex flex-col h-screen">
-      <PlatformBar showBackButton={showBackButton} />
+      <PlatformBar />
       <div className="flex-1 overflow-hidden">
         {children}
       </div>
