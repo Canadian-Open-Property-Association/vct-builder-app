@@ -46,14 +46,14 @@ export default function SchemaBuilderApp() {
       {/* Main Content - Three Panel Layout */}
       <main className="flex-1 flex overflow-hidden">
         {/* Left Panel - Governance Docs + Property Tree */}
-        <div className="w-1/3 border-r border-gray-300 bg-white flex flex-col overflow-hidden">
+        <div className="w-1/3 border-r border-gray-300 bg-white overflow-y-auto">
           {/* Governance Docs Section */}
           <div className="border-b border-gray-200">
             <GovernanceDocsList />
           </div>
 
           {/* Property Tree Section */}
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div>
             <PropertyTree />
           </div>
         </div>
