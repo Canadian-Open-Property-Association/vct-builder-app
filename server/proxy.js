@@ -415,6 +415,217 @@ app.delete('/api/projects/:id', requireProjectAuth, (req, res) => {
   }
 });
 
+// ============================================
+// Schema Projects API (per-user server storage)
+// ============================================
+
+// Schema projects directory
+const SCHEMA_PROJECTS_DIR = path.join(ASSETS_DIR, 'schema-projects');
+if (!fs.existsSync(SCHEMA_PROJECTS_DIR)) {
+  fs.mkdirSync(SCHEMA_PROJECTS_DIR, { recursive: true });
+}
+
+// Helper: Get user's schema projects file path
+const getUserSchemaProjectsFile = (userId) => {
+  return path.join(SCHEMA_PROJECTS_DIR, `user-${userId}.json`);
+};
+
+// Helper: Load user's schema projects
+const loadUserSchemaProjects = (userId) => {
+  const filePath = getUserSchemaProjectsFile(userId);
+  try {
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    }
+  } catch (e) {
+    console.error(`Error loading schema projects for user ${userId}:`, e);
+  }
+  return { projects: [] };
+};
+
+// Helper: Save user's schema projects
+const saveUserSchemaProjects = (userId, data) => {
+  const filePath = getUserSchemaProjectsFile(userId);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+};
+
+// List all schema projects for current user
+app.get('/api/schema-projects', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const data = loadUserSchemaProjects(userId);
+    res.json(data.projects);
+  } catch (error) {
+    console.error('Error listing schema projects:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get a specific schema project
+app.get('/api/schema-projects/:id', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id } = req.params;
+    const data = loadUserSchemaProjects(userId);
+    const project = data.projects.find(p => p.id === id);
+
+    if (!project) {
+      return res.status(404).json({ error: 'Schema project not found' });
+    }
+
+    res.json(project);
+  } catch (error) {
+    console.error('Error getting schema project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create a new schema project
+app.post('/api/schema-projects', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id, name, metadata, properties } = req.body;
+
+    if (!id || !name) {
+      return res.status(400).json({ error: 'id and name are required' });
+    }
+
+    const data = loadUserSchemaProjects(userId);
+    const now = new Date().toISOString();
+
+    const newProject = {
+      id,
+      name,
+      metadata: metadata || {},
+      properties: properties || [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    data.projects.push(newProject);
+    saveUserSchemaProjects(userId, data);
+
+    res.json(newProject);
+  } catch (error) {
+    console.error('Error creating schema project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update an existing schema project
+app.put('/api/schema-projects/:id', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id } = req.params;
+    const { name, metadata, properties } = req.body;
+
+    const data = loadUserSchemaProjects(userId);
+    const projectIndex = data.projects.findIndex(p => p.id === id);
+
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: 'Schema project not found' });
+    }
+
+    const updatedProject = {
+      ...data.projects[projectIndex],
+      name: name ?? data.projects[projectIndex].name,
+      metadata: metadata ?? data.projects[projectIndex].metadata,
+      properties: properties ?? data.projects[projectIndex].properties,
+      updatedAt: new Date().toISOString(),
+    };
+
+    data.projects[projectIndex] = updatedProject;
+    saveUserSchemaProjects(userId, data);
+
+    res.json(updatedProject);
+  } catch (error) {
+    console.error('Error updating schema project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a schema project
+app.delete('/api/schema-projects/:id', requireProjectAuth, (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { id } = req.params;
+
+    const data = loadUserSchemaProjects(userId);
+    const projectIndex = data.projects.findIndex(p => p.id === id);
+
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: 'Schema project not found' });
+    }
+
+    data.projects.splice(projectIndex, 1);
+    saveUserSchemaProjects(userId, data);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting schema project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Governance Docs API (fetch from GitHub)
+// ============================================
+
+// Governance docs configuration
+const GOVERNANCE_REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'Canadian-Open-Property-Association';
+const GOVERNANCE_REPO_NAME = process.env.GITHUB_REPO_NAME || 'verifiable-credentials';
+const GOVERNANCE_DOCS_PATH = 'site/governance';
+const GOVERNANCE_BASE_URL = 'https://openpropertyassociation.ca/governance';
+
+// Fetch governance docs from GitHub (public, no auth required)
+app.get('/api/governance-docs', async (req, res) => {
+  try {
+    // Fetch directory contents from GitHub API
+    const apiUrl = `https://api.github.com/repos/${GOVERNANCE_REPO_OWNER}/${GOVERNANCE_REPO_NAME}/contents/${GOVERNANCE_DOCS_PATH}`;
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'credential-design-tools',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+    }
+
+    const files = await response.json();
+
+    // Filter for markdown files and transform to GovernanceDoc format
+    const docs = files
+      .filter(file => file.type === 'file' && file.name.endsWith('.md') && file.name !== 'index.md')
+      .map(file => {
+        // Convert filename to display name (e.g., "home-credential.md" -> "Home Credential")
+        const displayName = file.name
+          .replace('.md', '')
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+
+        // Build the URL to the published doc
+        const url = `${GOVERNANCE_BASE_URL}/${file.name.replace('.md', '')}/`;
+
+        return {
+          name: file.name,
+          path: file.path,
+          displayName,
+          url,
+        };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    res.json(docs);
+  } catch (error) {
+    console.error('Error fetching governance docs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Hash generation endpoint (existing)
 app.get('/hash', async (req, res) => {
   const { url } = req.query;

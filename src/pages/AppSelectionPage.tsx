@@ -32,7 +32,7 @@ const apps: AppCard[] = [
       </svg>
     ),
     path: '/apps/schema-builder',
-    available: false,
+    available: true,
   },
 ];
 
