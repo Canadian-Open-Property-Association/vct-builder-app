@@ -133,6 +133,25 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Debug endpoint to check dist folder (temporary)
+app.get('/debug', (req, res) => {
+  const distPath = path.join(__dirname, '../dist');
+  const serverDir = __dirname;
+  const distExists = fs.existsSync(distPath);
+  const indexExists = distExists && fs.existsSync(path.join(distPath, 'index.html'));
+  const distContents = distExists ? fs.readdirSync(distPath) : [];
+
+  res.json({
+    serverDir,
+    distPath,
+    distExists,
+    indexExists,
+    distContents,
+    isProduction,
+    nodeEnv: process.env.NODE_ENV,
+  });
+});
+
 // List all assets
 app.get('/api/assets', (req, res) => {
   const meta = loadAssetsMeta();
