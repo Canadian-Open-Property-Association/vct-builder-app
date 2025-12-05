@@ -64,6 +64,7 @@ export default function VctBuilderApp() {
   // Panel visibility state for responsive layout
   const [showFormPanel, setShowFormPanel] = useState(true);
   const [showJsonPanel, setShowJsonPanel] = useState(true);
+  const [showPreviewPanel, setShowPreviewPanel] = useState(true);
   const [mobileActivePanel, setMobileActivePanel] = useState<MobilePanel>('preview');
 
   // Panel widths for resizable panels (in pixels)
@@ -120,6 +121,8 @@ export default function VctBuilderApp() {
         setShowFormPanel={setShowFormPanel}
         showJsonPanel={showJsonPanel}
         setShowJsonPanel={setShowJsonPanel}
+        showPreviewPanel={showPreviewPanel}
+        setShowPreviewPanel={setShowPreviewPanel}
       />
 
       {/* Mobile Panel Tabs - visible on small screens only */}
@@ -239,11 +242,12 @@ export default function VctBuilderApp() {
         )}
 
         {/* Right Panel - Credential Preview */}
+        {((mobileActivePanel === 'preview') || showPreviewPanel) && (
         <div
           className={`
             flex-col flex-1 bg-gray-50 overflow-y-auto transition-all duration-300
             ${mobileActivePanel === 'preview' ? 'flex w-full' : 'hidden'}
-            md:flex
+            ${showPreviewPanel ? 'md:flex' : 'md:hidden'}
           `}
         >
           {/* Preview Controls */}
@@ -303,6 +307,7 @@ export default function VctBuilderApp() {
           </div>
           <CredentialPreview locale={previewLocale} cardSide={cardSide} />
         </div>
+        )}
       </main>
     </div>
   );
