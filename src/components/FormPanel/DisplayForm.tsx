@@ -204,9 +204,9 @@ export default function DisplayForm() {
             />
           </div>
 
-          {/* Simple Rendering */}
+          {/* Card Styling */}
           <div className="border border-gray-200 rounded-lg p-4 space-y-4">
-            <h4 className="font-medium text-gray-800">Simple Card Rendering</h4>
+            <h4 className="font-medium text-gray-800">Card Styling</h4>
 
             {/* Background Color */}
             <div>
@@ -302,80 +302,6 @@ export default function DisplayForm() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Logo URL */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Logo URL
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={display.rendering?.simple?.logo?.uri || ''}
-                  onChange={(e) =>
-                    updateRendering({
-                      simple: {
-                        ...display.rendering?.simple,
-                        logo: {
-                          ...display.rendering?.simple?.logo,
-                          uri: e.target.value,
-                        },
-                      },
-                    })
-                  }
-                  placeholder="https://example.com/logo.png"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => openAssetPicker('logo')}
-                  className="px-3 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700"
-                  title="Browse Asset Library"
-                >
-                  Browse
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const url = display.rendering?.simple?.logo?.uri;
-                    if (url) generateHash(url, 'logo');
-                  }}
-                  className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                >
-                  Hash
-                </button>
-              </div>
-              {display.rendering?.simple?.logo?.['uri#integrity'] && (
-                <p className="mt-1 text-xs text-green-600 font-mono truncate">
-                  {display.rendering.simple.logo['uri#integrity']}
-                </p>
-              )}
-            </div>
-
-            {/* Logo Alt Text */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Logo Alt Text
-              </label>
-              <input
-                type="text"
-                value={display.rendering?.simple?.logo?.alt_text || ''}
-                onChange={(e) =>
-                  updateRendering({
-                    simple: {
-                      ...display.rendering?.simple,
-                      logo: {
-                        ...display.rendering?.simple?.logo,
-                        uri: display.rendering?.simple?.logo?.uri || '',
-                        alt_text: e.target.value,
-                      },
-                    },
-                  })
-                }
-                placeholder="Organization logo"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
             </div>
 
             {/* Background Image URL */}

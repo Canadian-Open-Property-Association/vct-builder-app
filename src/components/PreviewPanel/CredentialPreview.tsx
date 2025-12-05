@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { useVctStore } from '../../store/vctStore';
 import {
   getLocaleName,
@@ -10,6 +10,73 @@ import {
 interface CredentialPreviewProps {
   locale: string;
   cardSide?: 'front' | 'back';
+}
+
+// Component that auto-sizes text to fit within a container on one line
+interface AutoSizeTextProps {
+  text: string;
+  maxFontSize: number;
+  minFontSize?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  maxWidth?: number; // Optional max width in pixels
+}
+
+function AutoSizeText({
+  text,
+  maxFontSize,
+  minFontSize = 8,
+  className = '',
+  style = {},
+  maxWidth,
+}: AutoSizeTextProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [fontSize, setFontSize] = useState(maxFontSize);
+
+  const calculateFontSize = useCallback(() => {
+    if (!containerRef.current || !textRef.current || !text) {
+      setFontSize(maxFontSize);
+      return;
+    }
+
+    const containerWidth = maxWidth || containerRef.current.offsetWidth;
+    if (containerWidth === 0) return;
+
+    // Start with max font size and reduce until it fits
+    let currentSize = maxFontSize;
+    textRef.current.style.fontSize = `${currentSize}px`;
+    textRef.current.style.whiteSpace = 'nowrap';
+
+    while (textRef.current.scrollWidth > containerWidth && currentSize > minFontSize) {
+      currentSize -= 0.5;
+      textRef.current.style.fontSize = `${currentSize}px`;
+    }
+
+    setFontSize(currentSize);
+  }, [text, maxFontSize, minFontSize, maxWidth]);
+
+  useLayoutEffect(() => {
+    calculateFontSize();
+    // Recalculate on resize
+    window.addEventListener('resize', calculateFontSize);
+    return () => window.removeEventListener('resize', calculateFontSize);
+  }, [calculateFontSize]);
+
+  return (
+    <div ref={containerRef} className={className} style={{ ...style, overflow: 'hidden' }}>
+      <span
+        ref={textRef}
+        style={{
+          fontSize: `${fontSize}px`,
+          whiteSpace: 'nowrap',
+          display: 'block',
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  );
 }
 
 export default function CredentialPreview({ locale, cardSide }: CredentialPreviewProps) {
@@ -142,6 +209,34 @@ export default function CredentialPreview({ locale, cardSide }: CredentialPrevie
     const simple = display.rendering?.simple;
     const cardElements = display.card_elements?.front;
 
+    // Helper to get text content with fallback
+    const getPrimaryText = () =>
+      getClaimValue(cardElements?.primary_attribute?.claim_path) ||
+      cardElements?.primary_attribute?.value ||
+      'Primary Attribute';
+
+    const getSecondaryText = () =>
+      getClaimValue(cardElements?.secondary_attribute?.claim_path) ||
+      cardElements?.secondary_attribute?.value ||
+      'Secondary Attribute';
+
+    const getPortfolioIssuerText = () =>
+      cardElements?.portfolio_issuer?.value || '';
+
+    const getCredentialNameText = () =>
+      cardElements?.credential_name?.value || display.name || 'Credential Name';
+
+    const getCredentialIssuerText = () =>
+      getClaimValue(cardElements?.credential_issuer?.claim_path) ||
+      cardElements?.credential_issuer?.value ||
+      '';
+
+    const isPrimaryPlaceholder = !getClaimValue(cardElements?.primary_attribute?.claim_path) &&
+      !cardElements?.primary_attribute?.value;
+    const isSecondaryPlaceholder = !getClaimValue(cardElements?.secondary_attribute?.claim_path) &&
+      !cardElements?.secondary_attribute?.value;
+    const isCredentialNamePlaceholder = !cardElements?.credential_name?.value && !display.name;
+
     return (
       <div
         className="rounded-xl shadow-lg overflow-hidden flex flex-col"
@@ -155,22 +250,29 @@ export default function CredentialPreview({ locale, cardSide }: CredentialPrevie
       >
         {/* Top Row: Portfolio Issuer + Network Mark */}
         <div className="p-4 flex items-start justify-between flex-shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" style={{ maxWidth: '150px' }}>
             {cardElements?.portfolio_issuer?.logo_uri ? (
               <img
                 src={cardElements.portfolio_issuer.logo_uri}
                 alt="Portfolio Issuer"
-                className="h-8 w-auto object-contain"
+                className="h-8 w-auto object-contain flex-shrink-0"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             ) : null}
-            <span className="text-xs">
-              {cardElements?.portfolio_issuer?.value || (
-                !cardElements?.portfolio_issuer?.logo_uri && <span className="opacity-50">Portfolio Issuer</span>
-              )}
-            </span>
+            {getPortfolioIssuerText() ? (
+              <AutoSizeText
+                text={getPortfolioIssuerText()}
+                maxFontSize={12}
+                minFontSize={8}
+                maxWidth={cardElements?.portfolio_issuer?.logo_uri ? 100 : 150}
+              />
+            ) : (
+              !cardElements?.portfolio_issuer?.logo_uri && (
+                <span className="text-xs opacity-50">Portfolio Issuer</span>
+              )
+            )}
           </div>
           <div className="flex items-center gap-2">
             {cardElements?.network_mark?.logo_uri ? (
@@ -192,46 +294,61 @@ export default function CredentialPreview({ locale, cardSide }: CredentialPrevie
 
         {/* Center: Primary & Secondary Attributes */}
         <div className="px-4 flex-grow flex flex-col justify-center">
-          <div className="text-lg font-bold">
-            {getClaimValue(cardElements?.primary_attribute?.claim_path) ||
-              cardElements?.primary_attribute?.value || (
-                <span className="opacity-50">Primary Attribute</span>
-              )}
-          </div>
+          <AutoSizeText
+            text={getPrimaryText()}
+            maxFontSize={18}
+            minFontSize={10}
+            className="font-bold"
+            style={{ opacity: isPrimaryPlaceholder ? 0.5 : 1 }}
+            maxWidth={308} // 340px - 32px padding
+          />
           {cardElements?.secondary_attribute && (
-            <div className="text-sm opacity-80 mt-1">
-              {getClaimValue(cardElements?.secondary_attribute?.claim_path) ||
-                cardElements?.secondary_attribute?.value || (
-                  <span className="opacity-50">Secondary Attribute</span>
-                )}
-            </div>
+            <AutoSizeText
+              text={getSecondaryText()}
+              maxFontSize={14}
+              minFontSize={9}
+              className="mt-1"
+              style={{ opacity: isSecondaryPlaceholder ? 0.5 : 0.8 }}
+              maxWidth={308}
+            />
           )}
         </div>
 
         {/* Bottom Row: Credential Name + Issuer */}
-        <div className="px-4 py-3 flex justify-between items-end text-xs" style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
-          <div>
-            {cardElements?.credential_name?.value || display.name || (
-              <span className="opacity-50">Credential Name</span>
-            )}
+        <div className="px-4 py-3 flex justify-between items-end gap-2" style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
+          <div style={{ maxWidth: '150px' }}>
+            <AutoSizeText
+              text={getCredentialNameText()}
+              maxFontSize={12}
+              minFontSize={8}
+              style={{ opacity: isCredentialNamePlaceholder ? 0.5 : 1 }}
+              maxWidth={150}
+            />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" style={{ maxWidth: '150px' }}>
             {cardElements?.credential_issuer?.logo_uri ? (
               <img
                 src={cardElements.credential_issuer.logo_uri}
                 alt="Credential Issuer"
-                className="h-6 w-auto object-contain"
+                className="h-6 w-auto object-contain flex-shrink-0"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             ) : null}
-            <span className="text-right opacity-75">
-              {getClaimValue(cardElements?.credential_issuer?.claim_path) ||
-                cardElements?.credential_issuer?.value || (
-                  !cardElements?.credential_issuer?.logo_uri && <span className="opacity-50">Issuer</span>
-                )}
-            </span>
+            {getCredentialIssuerText() ? (
+              <AutoSizeText
+                text={getCredentialIssuerText()}
+                maxFontSize={12}
+                minFontSize={8}
+                style={{ opacity: 0.75, textAlign: 'right' }}
+                maxWidth={cardElements?.credential_issuer?.logo_uri ? 100 : 150}
+              />
+            ) : (
+              !cardElements?.credential_issuer?.logo_uri && (
+                <span className="text-xs opacity-50">Issuer</span>
+              )
+            )}
           </div>
         </div>
       </div>

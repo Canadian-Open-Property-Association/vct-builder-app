@@ -25,7 +25,7 @@ const POSITION_OPTIONS: { value: CardElementPosition; label: string }[] = [
   { value: 'center_bottom', label: 'Center Bottom' },
 ];
 
-const FRONT_ELEMENTS: {
+type FrontElementConfig = {
   key: keyof VCTFrontCardElements;
   label: string;
   description: string;
@@ -33,7 +33,26 @@ const FRONT_ELEMENTS: {
   isFixed?: boolean;
   fixedValue?: string;
   supportsLogo?: boolean; // Whether this element can have a logo/icon
-}[] = [
+};
+
+// Display Attributes - the data shown on the card
+const DISPLAY_ATTRIBUTES: FrontElementConfig[] = [
+  {
+    key: 'primary_attribute',
+    label: 'Primary Attribute',
+    description: 'Main identifying information (address, name, license number)',
+    defaultPosition: 'center',
+  },
+  {
+    key: 'secondary_attribute',
+    label: 'Secondary Attribute',
+    description: 'Supporting information (holder name, role)',
+    defaultPosition: 'center_below',
+  },
+];
+
+// Card Branding - identity and branding elements
+const CARD_BRANDING: FrontElementConfig[] = [
   {
     key: 'portfolio_issuer',
     label: 'Portfolio Issuer',
@@ -49,18 +68,6 @@ const FRONT_ELEMENTS: {
     isFixed: true,
     fixedValue: 'cornerstone',
     supportsLogo: true,
-  },
-  {
-    key: 'primary_attribute',
-    label: 'Primary Attribute',
-    description: 'Main identifying information (address, name, license number)',
-    defaultPosition: 'center',
-  },
-  {
-    key: 'secondary_attribute',
-    label: 'Secondary Attribute',
-    description: 'Supporting information (holder name, role)',
-    defaultPosition: 'center_below',
   },
   {
     key: 'credential_name',
@@ -170,13 +177,136 @@ export default function CardElementsForm({ displayIndex }: CardElementsFormProps
         </p>
       </div>
 
-      {/* Front of Card Elements */}
+      {/* Display Attributes Section */}
       <div className="space-y-4">
         <h5 className="text-sm font-semibold text-gray-700 border-b pb-2">
-          Front of Card
+          Display Attributes
         </h5>
+        <p className="text-xs text-gray-500 -mt-2">
+          The main data displayed on the front of the credential card.
+        </p>
 
-        {FRONT_ELEMENTS.map((elementConfig) => {
+        {DISPLAY_ATTRIBUTES.map((elementConfig) => {
+          const element = frontElements[elementConfig.key];
+
+          return (
+            <div
+              key={elementConfig.key}
+              className="border border-gray-100 rounded p-3 space-y-2"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-sm font-medium text-gray-700">
+                    {elementConfig.label}
+                  </span>
+                  <p className="text-xs text-gray-500">{elementConfig.description}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Position */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Position</label>
+                  <select
+                    value={element?.position || elementConfig.defaultPosition}
+                    onChange={(e) =>
+                      updateFrontElement(displayIndex, elementConfig.key, {
+                        position: e.target.value as CardElementPosition,
+                      })
+                    }
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                  >
+                    {POSITION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Value Source */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Source</label>
+                  <select
+                    value={element?.claim_path || ''}
+                    onChange={(e) => {
+                      if (e.target.value === '__static__') {
+                        updateFrontElement(displayIndex, elementConfig.key, {
+                          claim_path: undefined,
+                          value: '',
+                        });
+                      } else {
+                        updateFrontElement(displayIndex, elementConfig.key, {
+                          claim_path: e.target.value || undefined,
+                          value: undefined,
+                        });
+                      }
+                    }}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="">Select claim...</option>
+                    {claimPaths.map((cp) => (
+                      <option key={cp.path} value={cp.path}>
+                        {cp.label} ({cp.path})
+                      </option>
+                    ))}
+                    <option value="__static__">Static value</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Static value input (when not using claim_path) */}
+              {!element?.claim_path && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Static Value</label>
+                  <input
+                    type="text"
+                    value={element?.value || ''}
+                    onChange={(e) =>
+                      updateFrontElement(displayIndex, elementConfig.key, {
+                        value: e.target.value,
+                      })
+                    }
+                    placeholder="Enter static value..."
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                  />
+                </div>
+              )}
+
+              {/* Label (for claim-based elements) */}
+              {element?.claim_path && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Display Label (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={element?.label || ''}
+                    onChange={(e) =>
+                      updateFrontElement(displayIndex, elementConfig.key, {
+                        label: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Property Address"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Card Branding Section */}
+      <div className="space-y-4">
+        <h5 className="text-sm font-semibold text-gray-700 border-b pb-2">
+          Card Branding
+        </h5>
+        <p className="text-xs text-gray-500 -mt-2">
+          Identity and branding elements for the credential card.
+        </p>
+
+        {CARD_BRANDING.map((elementConfig) => {
           const element = frontElements[elementConfig.key];
 
           return (
