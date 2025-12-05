@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useVctStore } from '../../store/vctStore';
 import { isFrontBackFormat, VCTSvgTemplate, VCT } from '../../types/vct';
 
@@ -8,9 +6,9 @@ export default function JsonPreview() {
   const currentVct = useVctStore((state) => state.currentVct);
   const setVct = useVctStore((state) => state.setVct);
   const [copied, setCopied] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editedJson, setEditedJson] = useState('');
+  const [localJson, setLocalJson] = useState('');
   const [parseError, setParseError] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Clean up the VCT object for export (remove empty optional fields)
@@ -226,21 +224,19 @@ export default function JsonPreview() {
     return cleaned;
   }, [currentVct]);
 
-  const jsonString = JSON.stringify(cleanVct(), null, 2);
+  const storeJsonString = JSON.stringify(cleanVct(), null, 2);
 
-  // Initialize edited JSON when entering edit mode
+  // Sync local JSON with store when not focused (external changes)
   useEffect(() => {
-    if (isEditMode) {
-      setEditedJson(jsonString);
+    if (!isFocused) {
+      setLocalJson(storeJsonString);
       setParseError(null);
-      // Focus textarea when entering edit mode
-      setTimeout(() => textareaRef.current?.focus(), 0);
     }
-  }, [isEditMode]); // Only run when isEditMode changes, not when jsonString changes
+  }, [storeJsonString, isFocused]);
 
   // Validate JSON as user types
   const handleJsonChange = (value: string) => {
-    setEditedJson(value);
+    setLocalJson(value);
     try {
       JSON.parse(value);
       setParseError(null);
@@ -249,15 +245,22 @@ export default function JsonPreview() {
     }
   };
 
-  // Apply changes to store
-  const applyChanges = useCallback(() => {
+  // Apply changes to store on blur
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+
+    // Don't apply if there's a parse error
+    if (parseError) {
+      return;
+    }
+
     try {
-      const parsed = JSON.parse(editedJson) as VCT;
+      const parsed = JSON.parse(localJson) as VCT;
 
       // Basic validation - must have required fields
       if (!parsed.vct || !parsed.name || !Array.isArray(parsed.display)) {
         setParseError('Invalid VCT: missing required fields (vct, name, display)');
-        return false;
+        return;
       }
 
       // Ensure each display has required fields
@@ -265,7 +268,7 @@ export default function JsonPreview() {
         const d = parsed.display[i];
         if (!d.locale) {
           setParseError(`Invalid VCT: display[${i}] missing locale`);
-          return false;
+          return;
         }
       }
 
@@ -274,26 +277,23 @@ export default function JsonPreview() {
         parsed.claims = [];
       }
 
-      setVct(parsed);
+      // Only update if JSON actually changed
+      if (localJson !== storeJsonString) {
+        setVct(parsed);
+      }
       setParseError(null);
-      setIsEditMode(false);
-      return true;
     } catch (e) {
       setParseError((e as Error).message);
-      return false;
     }
-  }, [editedJson, setVct]);
+  }, [localJson, storeJsonString, parseError, setVct]);
 
-  // Cancel edit mode
-  const cancelEdit = () => {
-    setIsEditMode(false);
-    setEditedJson('');
-    setParseError(null);
+  const handleFocus = () => {
+    setIsFocused(true);
   };
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(isEditMode ? editedJson : jsonString);
+      await navigator.clipboard.writeText(localJson);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -302,8 +302,7 @@ export default function JsonPreview() {
   };
 
   const handleDownload = () => {
-    const content = isEditMode ? editedJson : jsonString;
-    const blob = new Blob([content], { type: 'application/json' });
+    const blob = new Blob([localJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -314,38 +313,18 @@ export default function JsonPreview() {
     URL.revokeObjectURL(url);
   };
 
+  // Reset to store value (discard local changes)
+  const handleReset = () => {
+    setLocalJson(storeJsonString);
+    setParseError(null);
+  };
+
+  const hasUnsavedChanges = localJson !== storeJsonString && !parseError;
+
   return (
     <div className="h-full flex flex-col">
       {/* Action buttons */}
-      <div className="flex gap-2 p-2 bg-gray-800 border-b border-gray-700 flex-wrap">
-        {isEditMode ? (
-          <>
-            <button
-              onClick={applyChanges}
-              disabled={!!parseError}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
-                parseError
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-500'
-              }`}
-            >
-              Apply Changes
-            </button>
-            <button
-              onClick={cancelEdit}
-              className="px-3 py-1 text-xs bg-gray-700 text-gray-300 hover:bg-gray-600 rounded"
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={() => setIsEditMode(true)}
-            className="px-3 py-1 text-xs bg-blue-600 text-white hover:bg-blue-500 rounded"
-          >
-            Edit JSON
-          </button>
-        )}
+      <div className="flex gap-2 p-2 bg-gray-800 border-b border-gray-700 flex-wrap items-center">
         <button
           onClick={handleCopy}
           className={`px-3 py-1 text-xs rounded transition-colors ${
@@ -362,6 +341,17 @@ export default function JsonPreview() {
         >
           Download
         </button>
+        {(parseError || hasUnsavedChanges) && (
+          <button
+            onClick={handleReset}
+            className="px-3 py-1 text-xs bg-gray-700 text-gray-300 hover:bg-gray-600 rounded"
+          >
+            Reset
+          </button>
+        )}
+        {hasUnsavedChanges && (
+          <span className="text-xs text-yellow-400 ml-auto">Click outside to apply</span>
+        )}
       </div>
 
       {/* Parse error message */}
@@ -371,35 +361,19 @@ export default function JsonPreview() {
         </div>
       )}
 
-      {/* JSON content */}
+      {/* JSON editor */}
       <div className="flex-1 overflow-auto">
-        {isEditMode ? (
-          <textarea
-            ref={textareaRef}
-            value={editedJson}
-            onChange={(e) => handleJsonChange(e.target.value)}
-            className={`w-full h-full p-4 bg-transparent text-gray-100 font-mono text-xs leading-relaxed resize-none focus:outline-none ${
-              parseError ? 'border-l-2 border-red-500' : ''
-            }`}
-            spellCheck={false}
-          />
-        ) : (
-          <SyntaxHighlighter
-            language="json"
-            style={vscDarkPlus}
-            customStyle={{
-              margin: 0,
-              padding: '1rem',
-              background: 'transparent',
-              fontSize: '0.75rem',
-              lineHeight: '1.5',
-            }}
-            wrapLines
-            wrapLongLines
-          >
-            {jsonString}
-          </SyntaxHighlighter>
-        )}
+        <textarea
+          ref={textareaRef}
+          value={localJson}
+          onChange={(e) => handleJsonChange(e.target.value)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          className={`w-full h-full p-4 bg-transparent text-gray-100 font-mono text-xs leading-relaxed resize-none focus:outline-none ${
+            parseError ? 'border-l-2 border-red-500' : ''
+          } ${hasUnsavedChanges ? 'border-l-2 border-yellow-500' : ''}`}
+          spellCheck={false}
+        />
       </div>
     </div>
   );
