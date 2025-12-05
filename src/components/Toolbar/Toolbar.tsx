@@ -4,6 +4,7 @@ import ImportModal from '../Modals/ImportModal';
 import NewProjectModal from '../Modals/NewProjectModal';
 import SaveToRepoModal from '../Library/SaveToRepoModal';
 import AssetLibrary from '../AssetLibrary/AssetLibrary';
+import ZoneTemplateLibrary from '../Library/ZoneTemplateLibrary';
 
 interface ToolbarProps {
   showFormPanel: boolean;
@@ -28,6 +29,7 @@ export default function Toolbar({
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showSaveToRepo, setShowSaveToRepo] = useState(false);
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
+  const [showZoneTemplates, setShowZoneTemplates] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -101,6 +103,15 @@ export default function Toolbar({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           Asset Library
+        </button>
+        <button
+          onClick={() => setShowZoneTemplates(true)}
+          className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-1"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+          </svg>
+          Zone Templates
         </button>
 
         {/* GitHub Integration Section */}
@@ -334,6 +345,12 @@ export default function Toolbar({
         onClose={() => setShowAssetLibrary(false)}
         onSelect={() => setShowAssetLibrary(false)}
         title="Asset Library"
+      />
+
+      {/* Zone Template Library Modal */}
+      <ZoneTemplateLibrary
+        isOpen={showZoneTemplates}
+        onClose={() => setShowZoneTemplates(false)}
       />
     </>
   );
