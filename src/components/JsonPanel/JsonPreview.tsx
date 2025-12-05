@@ -1,15 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useVctStore } from '../../store/vctStore';
-import { isFrontBackFormat, VCTSvgTemplate } from '../../types/vct';
+import { isFrontBackFormat, VCTSvgTemplate, VCT } from '../../types/vct';
 
 export default function JsonPreview() {
   const currentVct = useVctStore((state) => state.currentVct);
+  const setVct = useVctStore((state) => state.setVct);
   const [copied, setCopied] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedJson, setEditedJson] = useState('');
+  const [parseError, setParseError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Clean up the VCT object for export (remove empty optional fields)
-  const cleanVct = () => {
+  const cleanVct = useCallback(() => {
     const cleaned: Record<string, unknown> = {
       vct: currentVct.vct,
       name: currentVct.name,
@@ -219,13 +224,76 @@ export default function JsonPreview() {
     }
 
     return cleaned;
-  };
+  }, [currentVct]);
 
   const jsonString = JSON.stringify(cleanVct(), null, 2);
 
+  // Initialize edited JSON when entering edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      setEditedJson(jsonString);
+      setParseError(null);
+      // Focus textarea when entering edit mode
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [isEditMode]); // Only run when isEditMode changes, not when jsonString changes
+
+  // Validate JSON as user types
+  const handleJsonChange = (value: string) => {
+    setEditedJson(value);
+    try {
+      JSON.parse(value);
+      setParseError(null);
+    } catch (e) {
+      setParseError((e as Error).message);
+    }
+  };
+
+  // Apply changes to store
+  const applyChanges = useCallback(() => {
+    try {
+      const parsed = JSON.parse(editedJson) as VCT;
+
+      // Basic validation - must have required fields
+      if (!parsed.vct || !parsed.name || !Array.isArray(parsed.display)) {
+        setParseError('Invalid VCT: missing required fields (vct, name, display)');
+        return false;
+      }
+
+      // Ensure each display has required fields
+      for (let i = 0; i < parsed.display.length; i++) {
+        const d = parsed.display[i];
+        if (!d.locale) {
+          setParseError(`Invalid VCT: display[${i}] missing locale`);
+          return false;
+        }
+      }
+
+      // Ensure claims array exists (even if empty)
+      if (!parsed.claims) {
+        parsed.claims = [];
+      }
+
+      setVct(parsed);
+      setParseError(null);
+      setIsEditMode(false);
+      return true;
+    } catch (e) {
+      setParseError((e as Error).message);
+      return false;
+    }
+  }, [editedJson, setVct]);
+
+  // Cancel edit mode
+  const cancelEdit = () => {
+    setIsEditMode(false);
+    setEditedJson('');
+    setParseError(null);
+  };
+
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(jsonString);
+      await navigator.clipboard.writeText(isEditMode ? editedJson : jsonString);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -234,7 +302,8 @@ export default function JsonPreview() {
   };
 
   const handleDownload = () => {
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    const content = isEditMode ? editedJson : jsonString;
+    const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -248,7 +317,35 @@ export default function JsonPreview() {
   return (
     <div className="h-full flex flex-col">
       {/* Action buttons */}
-      <div className="flex gap-2 p-2 bg-gray-800 border-b border-gray-700">
+      <div className="flex gap-2 p-2 bg-gray-800 border-b border-gray-700 flex-wrap">
+        {isEditMode ? (
+          <>
+            <button
+              onClick={applyChanges}
+              disabled={!!parseError}
+              className={`px-3 py-1 text-xs rounded transition-colors ${
+                parseError
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-500'
+              }`}
+            >
+              Apply Changes
+            </button>
+            <button
+              onClick={cancelEdit}
+              className="px-3 py-1 text-xs bg-gray-700 text-gray-300 hover:bg-gray-600 rounded"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setIsEditMode(true)}
+            className="px-3 py-1 text-xs bg-blue-600 text-white hover:bg-blue-500 rounded"
+          >
+            Edit JSON
+          </button>
+        )}
         <button
           onClick={handleCopy}
           className={`px-3 py-1 text-xs rounded transition-colors ${
@@ -257,33 +354,52 @@ export default function JsonPreview() {
               : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
           }`}
         >
-          {copied ? 'Copied!' : 'Copy JSON'}
+          {copied ? 'Copied!' : 'Copy'}
         </button>
         <button
           onClick={handleDownload}
           className="px-3 py-1 text-xs bg-gray-700 text-gray-300 hover:bg-gray-600 rounded"
         >
-          Download JSON
+          Download
         </button>
       </div>
 
+      {/* Parse error message */}
+      {parseError && (
+        <div className="px-3 py-2 bg-red-900/50 border-b border-red-700 text-red-300 text-xs">
+          <span className="font-semibold">JSON Error:</span> {parseError}
+        </div>
+      )}
+
       {/* JSON content */}
       <div className="flex-1 overflow-auto">
-        <SyntaxHighlighter
-          language="json"
-          style={vscDarkPlus}
-          customStyle={{
-            margin: 0,
-            padding: '1rem',
-            background: 'transparent',
-            fontSize: '0.75rem',
-            lineHeight: '1.5',
-          }}
-          wrapLines
-          wrapLongLines
-        >
-          {jsonString}
-        </SyntaxHighlighter>
+        {isEditMode ? (
+          <textarea
+            ref={textareaRef}
+            value={editedJson}
+            onChange={(e) => handleJsonChange(e.target.value)}
+            className={`w-full h-full p-4 bg-transparent text-gray-100 font-mono text-xs leading-relaxed resize-none focus:outline-none ${
+              parseError ? 'border-l-2 border-red-500' : ''
+            }`}
+            spellCheck={false}
+          />
+        ) : (
+          <SyntaxHighlighter
+            language="json"
+            style={vscDarkPlus}
+            customStyle={{
+              margin: 0,
+              padding: '1rem',
+              background: 'transparent',
+              fontSize: '0.75rem',
+              lineHeight: '1.5',
+            }}
+            wrapLines
+            wrapLongLines
+          >
+            {jsonString}
+          </SyntaxHighlighter>
+        )}
       </div>
     </div>
   );
