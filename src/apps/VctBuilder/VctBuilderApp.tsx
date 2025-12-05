@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useVctStore } from '../../store/vctStore';
 import { getLocaleName } from '../../types/vct';
+import { useAppTracking } from '../../hooks/useAppTracking';
 import MetadataForm from '../../components/FormPanel/MetadataForm';
 import DisplayForm from '../../components/FormPanel/DisplayForm';
 import ClaimsForm from '../../components/FormPanel/ClaimsForm';
@@ -57,6 +58,9 @@ function ResizableDivider({ onDrag }: { onDrag: (delta: number) => void }) {
 }
 
 export default function VctBuilderApp() {
+  // Track app access
+  useAppTracking('vct-builder', 'VCT Builder');
+
   const [activeSection, setActiveSection] = useState<FormSection>('metadata');
   const [previewLocale, setPreviewLocale] = useState<string>('en-CA');
   const [cardSide, setCardSide] = useState<'front' | 'back' | undefined>(undefined);
@@ -84,7 +88,6 @@ export default function VctBuilderApp() {
   }, []);
 
   const currentProjectName = useVctStore((state) => state.currentProjectName);
-  const updateProjectName = useVctStore((state) => state.updateProjectName);
   const isDirty = useVctStore((state) => state.isDirty);
   const currentVct = useVctStore((state) => state.currentVct);
 
@@ -102,15 +105,9 @@ export default function VctBuilderApp() {
               Build Verifiable Credential Type files for COPA
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={currentProjectName}
-              onChange={(e) => updateProjectName(e.target.value)}
-              className="text-lg font-medium bg-transparent border-b border-transparent hover:border-slate-500 focus:border-white focus:outline-none px-2 py-1 text-right text-white placeholder-slate-400"
-              placeholder="Project name"
-            />
-            {isDirty && <span className="text-yellow-400 text-lg" title="Unsaved changes">*</span>}
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span>{currentProjectName || 'Untitled'}</span>
+            {isDirty && <span className="text-yellow-400" title="Unsaved changes">*</span>}
           </div>
         </div>
       </header>

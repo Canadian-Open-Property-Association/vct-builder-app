@@ -1,5 +1,6 @@
 import express from 'express';
 import { Octokit } from 'octokit';
+import { logAccess } from './accessLogger.js';
 
 const router = express.Router();
 
@@ -79,6 +80,15 @@ router.get('/callback', async (req, res) => {
       avatar_url: user.avatar_url,
       email: user.email,
     };
+
+    // Log the login event
+    logAccess({
+      eventType: 'login',
+      user: req.session.user,
+      appId: null,
+      appName: null,
+      req
+    });
 
     res.redirect('/apps');
   } catch (error) {

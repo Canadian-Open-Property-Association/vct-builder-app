@@ -2,9 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import AppSelectionPage from './pages/AppSelectionPage';
 import AuthGuard from './components/Auth/AuthGuard';
+import AdminGuard from './components/Auth/AdminGuard';
 import PlatformShell from './components/Platform/PlatformShell';
 import VctBuilderApp from './apps/VctBuilder/VctBuilderApp';
 import SchemaBuilderApp from './apps/SchemaBuilder/SchemaBuilderApp';
+import AdminLogsApp from './apps/AdminLogs/AdminLogsApp';
 
 function App() {
   return (
@@ -43,6 +45,19 @@ function App() {
               <PlatformShell>
                 <SchemaBuilderApp />
               </PlatformShell>
+            </AuthGuard>
+          }
+        />
+
+        <Route
+          path="/apps/admin-logs/*"
+          element={
+            <AuthGuard>
+              <AdminGuard>
+                <PlatformShell>
+                  <AdminLogsApp />
+                </PlatformShell>
+              </AdminGuard>
             </AuthGuard>
           }
         />

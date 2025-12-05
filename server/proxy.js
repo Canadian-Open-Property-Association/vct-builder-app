@@ -8,6 +8,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import authRouter from './auth.js';
 import githubRouter from './github.js';
+import { initAccessLogger, logAccess, queryLogs } from './accessLogger.js';
+import { requireAdmin, isAdmin } from './adminMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +34,9 @@ if (!fs.existsSync(ASSETS_DIR)) {
 if (!fs.existsSync(PROJECTS_DIR)) {
   fs.mkdirSync(PROJECTS_DIR, { recursive: true });
 }
+
+// Initialize access logger
+initAccessLogger(ASSETS_DIR);
 
 // Assets metadata file
 const ASSETS_META_FILE = path.join(ASSETS_DIR, 'metadata.json');
@@ -563,6 +568,73 @@ app.delete('/api/schema-projects/:id', requireProjectAuth, (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting schema project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Admin API (access logs)
+// ============================================
+
+// Check if current user is admin
+app.get('/api/admin/check', requireProjectAuth, (req, res) => {
+  res.json({ isAdmin: isAdmin(req) });
+});
+
+// Get access logs (admin only)
+app.get('/api/admin/logs', requireProjectAuth, requireAdmin, (req, res) => {
+  try {
+    const {
+      event_type,
+      username,
+      app_id,
+      start_date,
+      end_date,
+      page,
+      limit,
+      sort_by,
+      sort_order
+    } = req.query;
+
+    const result = queryLogs({
+      event_type,
+      username,
+      app_id,
+      start_date,
+      end_date,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      sort_by,
+      sort_order
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching access logs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Track app access (authenticated users)
+app.post('/api/track-app-access', requireProjectAuth, (req, res) => {
+  try {
+    const { appId, appName } = req.body;
+
+    if (!appId || !appName) {
+      return res.status(400).json({ error: 'appId and appName are required' });
+    }
+
+    logAccess({
+      eventType: 'app_access',
+      user: req.session.user,
+      appId,
+      appName,
+      req
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error tracking app access:', error);
     res.status(500).json({ error: error.message });
   }
 });

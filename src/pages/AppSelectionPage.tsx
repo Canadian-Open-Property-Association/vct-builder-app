@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAdminStore } from '../store/adminStore';
 
 interface AppCard {
   id: string;
@@ -7,6 +9,7 @@ interface AppCard {
   icon: React.ReactNode;
   path: string;
   available: boolean;
+  adminOnly?: boolean;
 }
 
 const apps: AppCard[] = [
@@ -58,10 +61,31 @@ const apps: AppCard[] = [
     path: '/apps/badge-configurator',
     available: false,
   },
+  {
+    id: 'admin-logs',
+    name: 'Access Logs',
+    description: 'View user login and app access history across the platform',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    path: '/apps/admin-logs',
+    available: true,
+    adminOnly: true,
+  },
 ];
 
 export default function AppSelectionPage() {
   const navigate = useNavigate();
+  const { isAdmin, checkAdminStatus } = useAdminStore();
+
+  useEffect(() => {
+    checkAdminStatus();
+  }, [checkAdminStatus]);
+
+  // Filter apps - only show admin apps if user is admin
+  const visibleApps = apps.filter(app => !app.adminOnly || isAdmin);
 
   return (
     <div className="min-h-full bg-gray-50 py-12 px-4">
@@ -76,13 +100,15 @@ export default function AppSelectionPage() {
 
         {/* App Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {apps.map((app) => (
+          {visibleApps.map((app) => (
             <div
               key={app.id}
-              className={`relative bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all ${
+              className={`relative bg-white rounded-xl shadow-sm border overflow-hidden transition-all ${
                 app.available
-                  ? 'hover:shadow-lg hover:border-blue-300 cursor-pointer'
-                  : 'opacity-60'
+                  ? app.adminOnly
+                    ? 'hover:shadow-lg hover:border-purple-300 cursor-pointer border-purple-200'
+                    : 'hover:shadow-lg hover:border-blue-300 cursor-pointer border-gray-200'
+                  : 'opacity-60 border-gray-200'
               }`}
               onClick={() => app.available && navigate(app.path)}
             >
@@ -93,11 +119,20 @@ export default function AppSelectionPage() {
                 </div>
               )}
 
+              {/* Admin Badge */}
+              {app.adminOnly && (
+                <div className="absolute top-3 right-3 px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                  Admin
+                </div>
+              )}
+
               <div className="p-6">
                 {/* Icon */}
                 <div className={`w-14 h-14 rounded-lg flex items-center justify-center mb-4 ${
                   app.available
-                    ? 'bg-blue-100 text-blue-600'
+                    ? app.adminOnly
+                      ? 'bg-purple-100 text-purple-600'
+                      : 'bg-blue-100 text-blue-600'
                     : 'bg-gray-100 text-gray-400'
                 }`}>
                   {app.icon}
@@ -114,7 +149,11 @@ export default function AppSelectionPage() {
                 {/* Action */}
                 {app.available ? (
                   <button
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ${
+                      app.adminOnly
+                        ? 'bg-purple-600 hover:bg-purple-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(app.path);

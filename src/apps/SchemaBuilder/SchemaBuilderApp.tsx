@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSchemaStore } from '../../store/schemaStore';
+import { useAppTracking } from '../../hooks/useAppTracking';
 import SchemaToolbar from './components/SchemaToolbar';
 import GovernanceDocsList from './components/GovernanceDocsList';
 import PropertyTree from './components/PropertyTree';
@@ -7,6 +8,9 @@ import PropertyEditor from './components/PropertyEditor';
 import SchemaJsonPreview from './components/SchemaJsonPreview';
 
 export default function SchemaBuilderApp() {
+  // Track app access
+  useAppTracking('schema-builder', 'Schema Builder');
+
   const currentProjectName = useSchemaStore((state) => state.currentProjectName);
   const isDirty = useSchemaStore((state) => state.isDirty);
   const fetchGovernanceDocs = useSchemaStore((state) => state.fetchGovernanceDocs);
