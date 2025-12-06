@@ -35,15 +35,15 @@ export default function PlatformBar() {
   };
 
   return (
-    <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between shadow-md">
+    <div className="bg-red-700 text-white px-4 py-2 flex items-center justify-between shadow-md">
       {/* Left: Logo and Platform Name */}
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-        </div>
-        <span className="font-semibold text-lg">Credential Design Tools</span>
+        <img
+          src="/favicon.png"
+          alt="COPA"
+          className="w-8 h-8"
+        />
+        <span className="font-semibold text-lg">COPA Apps</span>
       </div>
 
       {/* Right: User Dropdown */}
@@ -51,16 +51,16 @@ export default function PlatformBar() {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-slate-800 transition-colors"
+            className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-red-800 transition-colors"
           >
             <img
               src={user.avatar_url}
               alt={user.login}
-              className="w-7 h-7 rounded-full border-2 border-slate-700"
+              className="w-7 h-7 rounded-full border-2 border-red-600"
             />
-            <span className="text-sm text-slate-300">{user.name || user.login}</span>
+            <span className="text-sm text-red-100">{user.name || user.login}</span>
             <svg
-              className={`w-4 h-4 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+              className={`w-4 h-4 text-red-200 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

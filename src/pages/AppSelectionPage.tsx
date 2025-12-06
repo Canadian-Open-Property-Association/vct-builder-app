@@ -12,7 +12,7 @@ interface AppCard {
   adminOnly?: boolean;
 }
 
-const RECENT_APPS_KEY = 'credential-tools-recent-apps';
+const RECENT_APPS_KEY = 'copa-apps-recent-apps';
 const MAX_RECENT_APPS = 2;
 
 const apps: AppCard[] = [
@@ -231,7 +231,7 @@ export default function AppSelectionPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gray-900">Welcome to Credential Design Tools</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Welcome to COPA Apps</h1>
           <p className="mt-2 text-gray-600">
             Select an application to get started
           </p>
