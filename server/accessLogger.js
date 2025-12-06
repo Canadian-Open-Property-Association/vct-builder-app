@@ -56,8 +56,8 @@ export const logAccess = ({ eventType, user, appId, appName, req }) => {
 
   try {
     const stmt = db.prepare(`
-      INSERT INTO access_logs (event_type, user_id, username, display_name, avatar_url, app_id, app_name, ip_address, user_agent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO access_logs (event_type, user_id, username, display_name, avatar_url, app_id, app_name, ip_address, user_agent, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -69,7 +69,8 @@ export const logAccess = ({ eventType, user, appId, appName, req }) => {
       appId || null,
       appName || null,
       req.ip || req.connection?.remoteAddress || null,
-      req.get?.('User-Agent') || null
+      req.get?.('User-Agent') || null,
+      new Date().toISOString()
     );
   } catch (error) {
     console.error('Failed to log access event:', error);
