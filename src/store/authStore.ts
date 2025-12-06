@@ -42,14 +42,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       if (data.authenticated) {
         set({ user: data.user, isAuthenticated: true, isLoading: false });
-        // Reload user-specific projects after auth check
+        // Reload user-specific data after auth check
         const { reloadUserProjects } = await import('./vctStore');
+        const { reloadUserTemplates } = await import('./zoneTemplateStore');
         reloadUserProjects();
+        reloadUserTemplates();
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
-        // Load anonymous projects
+        // Load anonymous data
         const { reloadUserProjects } = await import('./vctStore');
+        const { reloadUserTemplates } = await import('./zoneTemplateStore');
         reloadUserProjects();
+        reloadUserTemplates();
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -69,9 +73,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         credentials: 'include',
       });
       set({ user: null, isAuthenticated: false });
-      // Reload to anonymous projects
+      // Reload to anonymous data
       const { reloadUserProjects } = await import('./vctStore');
+      const { reloadUserTemplates } = await import('./zoneTemplateStore');
       reloadUserProjects();
+      reloadUserTemplates();
       // Redirect to login page
       window.location.href = '/login';
     } catch (error) {
