@@ -27,6 +27,7 @@ const SCALE = 1.5; // Scale factor for larger editing canvas
 const CANVAS_WIDTH = CARD_WIDTH * SCALE;
 const CANVAS_HEIGHT = CARD_HEIGHT * SCALE;
 const MIN_ZONE_SIZE = 5; // Minimum 5% width/height
+const GRID_SIZE = 8; // 8x8 grid
 
 export default function ZoneEditor({ onClose }: ZoneEditorProps) {
   const editingTemplate = useZoneTemplateStore((state) => state.editingTemplate);
@@ -43,8 +44,23 @@ export default function ZoneEditor({ onClose }: ZoneEditorProps) {
   const [editingZoneName, setEditingZoneName] = useState<string | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [newZonePosition, setNewZonePosition] = useState<ZonePosition | null>(null);
+  const [templateName, setTemplateName] = useState(editingTemplate?.name || '');
 
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Snap value to nearest grid line
+  const snapToGrid = useCallback((value: number): number => {
+    const gridStep = 100 / GRID_SIZE;
+    return Math.round(value / gridStep) * gridStep;
+  }, []);
+
+  // Update template name in store
+  const handleTemplateNameChange = (name: string) => {
+    setTemplateName(name);
+    if (editingTemplate) {
+      setEditingTemplate({ ...editingTemplate, name });
+    }
+  };
 
   if (!editingTemplate) {
     return null;
@@ -155,20 +171,31 @@ export default function ZoneEditor({ onClose }: ZoneEditorProps) {
         const currentXPercent = pixelToPercent(pos.x, true);
         const currentYPercent = pixelToPercent(pos.y, false);
 
-        const x = Math.max(0, Math.min(startXPercent, currentXPercent));
-        const y = Math.max(0, Math.min(startYPercent, currentYPercent));
-        const width = Math.abs(currentXPercent - startXPercent);
-        const height = Math.abs(currentYPercent - startYPercent);
+        // Calculate raw position and size
+        let x = Math.min(startXPercent, currentXPercent);
+        let y = Math.min(startYPercent, currentYPercent);
+        let width = Math.abs(currentXPercent - startXPercent);
+        let height = Math.abs(currentYPercent - startYPercent);
 
-        // Clamp to canvas bounds
-        const clampedWidth = Math.min(width, 100 - x);
-        const clampedHeight = Math.min(height, 100 - y);
+        // Snap to grid
+        x = snapToGrid(Math.max(0, x));
+        y = snapToGrid(Math.max(0, y));
+        width = snapToGrid(width);
+        height = snapToGrid(height);
+
+        // Clamp to canvas bounds (snap to edge if beyond)
+        if (x + width > 100) {
+          width = 100 - x;
+        }
+        if (y + height > 100) {
+          height = 100 - y;
+        }
 
         setNewZonePosition({
           x,
           y,
-          width: clampedWidth,
-          height: clampedHeight,
+          width: Math.max(width, snapToGrid(MIN_ZONE_SIZE)),
+          height: Math.max(height, snapToGrid(MIN_ZONE_SIZE)),
         });
       } else if (dragState.type === 'move' && dragState.zoneId && dragState.initialPosition) {
         const deltaX = pixelToPercent(pos.x - dragState.startX, true);
@@ -180,9 +207,22 @@ export default function ZoneEditor({ onClose }: ZoneEditorProps) {
         let newX = dragState.initialPosition.x + deltaX;
         let newY = dragState.initialPosition.y + deltaY;
 
-        // Clamp to bounds
-        newX = Math.max(0, Math.min(100 - zone.position.width, newX));
-        newY = Math.max(0, Math.min(100 - zone.position.height, newY));
+        // Snap to edge if beyond bounds, otherwise snap to grid
+        if (newX < 0) {
+          newX = 0;
+        } else if (newX + zone.position.width > 100) {
+          newX = 100 - zone.position.width;
+        } else {
+          newX = snapToGrid(newX);
+        }
+
+        if (newY < 0) {
+          newY = 0;
+        } else if (newY + zone.position.height > 100) {
+          newY = 100 - zone.position.height;
+        } else {
+          newY = snapToGrid(newY);
+        }
 
         const newPosition = {
           ...zone.position,
@@ -204,32 +244,60 @@ export default function ZoneEditor({ onClose }: ZoneEditorProps) {
         let { x, y, width, height } = dragState.initialPosition;
         const handle = dragState.resizeHandle;
 
-        // Adjust based on resize handle
+        // Adjust based on resize handle with snap-to-grid and snap-to-edge
         if (handle?.includes('w')) {
-          const newX = x + deltaX;
-          const newWidth = width - deltaX;
-          if (newX >= 0 && newWidth >= MIN_ZONE_SIZE) {
+          let newX = x + deltaX;
+          let newWidth = width - deltaX;
+          // Snap to edge if beyond left border
+          if (newX < 0) {
+            newWidth = width + x; // Extend to left edge
+            newX = 0;
+          } else {
+            newX = snapToGrid(newX);
+            newWidth = snapToGrid(newWidth);
+          }
+          if (newWidth >= MIN_ZONE_SIZE) {
             x = newX;
             width = newWidth;
           }
         }
         if (handle?.includes('e')) {
-          const newWidth = width + deltaX;
-          if (x + newWidth <= 100 && newWidth >= MIN_ZONE_SIZE) {
+          let newWidth = width + deltaX;
+          // Snap to edge if beyond right border
+          if (x + newWidth > 100) {
+            newWidth = 100 - x;
+          } else {
+            newWidth = snapToGrid(newWidth);
+          }
+          if (newWidth >= MIN_ZONE_SIZE) {
             width = newWidth;
           }
         }
         if (handle?.includes('n')) {
-          const newY = y + deltaY;
-          const newHeight = height - deltaY;
-          if (newY >= 0 && newHeight >= MIN_ZONE_SIZE) {
+          let newY = y + deltaY;
+          let newHeight = height - deltaY;
+          // Snap to edge if beyond top border
+          if (newY < 0) {
+            newHeight = height + y; // Extend to top edge
+            newY = 0;
+          } else {
+            newY = snapToGrid(newY);
+            newHeight = snapToGrid(newHeight);
+          }
+          if (newHeight >= MIN_ZONE_SIZE) {
             y = newY;
             height = newHeight;
           }
         }
         if (handle?.includes('s')) {
-          const newHeight = height + deltaY;
-          if (y + newHeight <= 100 && newHeight >= MIN_ZONE_SIZE) {
+          let newHeight = height + deltaY;
+          // Snap to edge if beyond bottom border
+          if (y + newHeight > 100) {
+            newHeight = 100 - y;
+          } else {
+            newHeight = snapToGrid(newHeight);
+          }
+          if (newHeight >= MIN_ZONE_SIZE) {
             height = newHeight;
           }
         }
@@ -281,6 +349,7 @@ export default function ZoneEditor({ onClose }: ZoneEditorProps) {
     checkOverlap,
     addZone,
     updateZone,
+    snapToGrid,
   ]);
 
   const handleDeleteZone = (zoneId: string) => {
@@ -315,10 +384,16 @@ export default function ZoneEditor({ onClose }: ZoneEditorProps) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800">Zone Template Editor</h2>
-            <p className="text-sm text-gray-500">{editingTemplate.name}</p>
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center gap-4">
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">Template Name</label>
+            <input
+              type="text"
+              value={templateName}
+              onChange={(e) => handleTemplateNameChange(e.target.value)}
+              placeholder="Enter template name..."
+              className="w-full max-w-md px-3 py-2 text-lg font-semibold border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
           <div className="flex gap-2">
             <button
@@ -396,14 +471,32 @@ export default function ZoneEditor({ onClose }: ZoneEditorProps) {
               }}
               onMouseDown={handleCanvasMouseDown}
             >
-              {/* Grid lines for guidance */}
+              {/* 8x8 Grid lines for guidance */}
               <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-200" />
-                <div className="absolute top-1/2 left-0 right-0 h-px bg-gray-200" />
-                <div className="absolute left-1/4 top-0 bottom-0 w-px bg-gray-100" />
-                <div className="absolute left-3/4 top-0 bottom-0 w-px bg-gray-100" />
-                <div className="absolute top-1/4 left-0 right-0 h-px bg-gray-100" />
-                <div className="absolute top-3/4 left-0 right-0 h-px bg-gray-100" />
+                {/* Vertical lines */}
+                {Array.from({ length: GRID_SIZE - 1 }, (_, i) => {
+                  const pos = ((i + 1) / GRID_SIZE) * 100;
+                  const isMajor = (i + 1) % 2 === 0; // Every other line is major
+                  return (
+                    <div
+                      key={`v-${i}`}
+                      className={`absolute top-0 bottom-0 w-px ${isMajor ? 'bg-gray-200' : 'bg-gray-100'}`}
+                      style={{ left: `${pos}%` }}
+                    />
+                  );
+                })}
+                {/* Horizontal lines */}
+                {Array.from({ length: GRID_SIZE - 1 }, (_, i) => {
+                  const pos = ((i + 1) / GRID_SIZE) * 100;
+                  const isMajor = (i + 1) % 2 === 0; // Every other line is major
+                  return (
+                    <div
+                      key={`h-${i}`}
+                      className={`absolute left-0 right-0 h-px ${isMajor ? 'bg-gray-200' : 'bg-gray-100'}`}
+                      style={{ top: `${pos}%` }}
+                    />
+                  );
+                })}
               </div>
 
               {/* Existing Zones */}
