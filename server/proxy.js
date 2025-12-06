@@ -171,8 +171,8 @@ app.get('/api/assets', (req, res) => {
   res.json(meta.assets);
 });
 
-// Upload new asset
-app.post('/api/assets', upload.single('file'), async (req, res) => {
+// Upload new asset (requires auth to track uploader)
+app.post('/api/assets', requireProjectAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -188,7 +188,7 @@ app.post('/api/assets', upload.single('file'), async (req, res) => {
     const hashBase64 = hash.digest('base64');
     const integrityHash = `sha256-${hashBase64}`;
 
-    // Create asset record
+    // Create asset record with uploader info
     const asset = {
       id: filename.replace(/\.[^/.]+$/, ''), // filename without extension as ID
       filename,
@@ -199,6 +199,11 @@ app.post('/api/assets', upload.single('file'), async (req, res) => {
       hash: integrityHash,
       uri: `/assets/${filename}`, // Use relative path so it works on any deployment
       createdAt: new Date().toISOString(),
+      uploader: {
+        id: String(req.session.user.id),
+        login: req.session.user.login,
+        name: req.session.user.name || undefined,
+      },
     };
 
     // Save to metadata
@@ -213,8 +218,8 @@ app.post('/api/assets', upload.single('file'), async (req, res) => {
   }
 });
 
-// Delete asset
-app.delete('/api/assets/:id', (req, res) => {
+// Delete asset (requires auth, only uploader can delete unless legacy asset)
+app.delete('/api/assets/:id', requireProjectAuth, (req, res) => {
   try {
     const { id } = req.params;
     const meta = loadAssetsMeta();
@@ -225,6 +230,11 @@ app.delete('/api/assets/:id', (req, res) => {
     }
 
     const asset = meta.assets[assetIndex];
+
+    // Check ownership: only uploader can delete, but allow any authenticated user for legacy assets without uploader
+    if (asset.uploader && asset.uploader.id !== String(req.session.user.id)) {
+      return res.status(403).json({ error: 'You can only delete your own assets' });
+    }
 
     // Delete file
     const filePath = path.join(ASSETS_DIR, asset.filename);
@@ -243,8 +253,8 @@ app.delete('/api/assets/:id', (req, res) => {
   }
 });
 
-// Rename asset
-app.patch('/api/assets/:id', (req, res) => {
+// Rename asset (requires auth, only uploader can rename unless legacy asset)
+app.patch('/api/assets/:id', requireProjectAuth, (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
@@ -254,6 +264,11 @@ app.patch('/api/assets/:id', (req, res) => {
 
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    // Check ownership: only uploader can rename, but allow any authenticated user for legacy assets without uploader
+    if (asset.uploader && asset.uploader.id !== String(req.session.user.id)) {
+      return res.status(403).json({ error: 'You can only rename your own assets' });
     }
 
     asset.name = name;

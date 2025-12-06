@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useAuthStore } from '../../store/authStore';
 
 interface Asset {
   id: string;
@@ -10,6 +11,11 @@ interface Asset {
   hash: string;
   uri: string;
   createdAt: string;
+  uploader?: {
+    id: string;
+    login: string;
+    name?: string;
+  };
 }
 
 interface AssetLibraryProps {
@@ -30,12 +36,22 @@ export default function AssetLibrary({ isOpen, onClose, onSelect, title = 'Asset
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentUser = useAuthStore((state) => state.user);
+
+  // Check if current user can manage (delete/rename) an asset
+  const canManageAsset = (asset: Asset) => {
+    if (!currentUser) return false;
+    // User can manage if they're the uploader or if asset has no uploader (legacy)
+    return !asset.uploader || asset.uploader.id === String(currentUser.id);
+  };
 
   const fetchAssets = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/api/assets`);
+      const response = await fetch(`${API_BASE}/api/assets`, {
+        credentials: 'include',
+      });
       if (!response.ok) throw new Error('Failed to fetch assets');
       const data = await response.json();
       setAssets(data);
@@ -67,6 +83,7 @@ export default function AssetLibrary({ isOpen, onClose, onSelect, title = 'Asset
       const response = await fetch(`${API_BASE}/api/assets`, {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -91,9 +108,13 @@ export default function AssetLibrary({ isOpen, onClose, onSelect, title = 'Asset
     try {
       const response = await fetch(`${API_BASE}/api/assets/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
-      if (!response.ok) throw new Error('Failed to delete');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete');
+      }
       await fetchAssets();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
@@ -107,6 +128,7 @@ export default function AssetLibrary({ isOpen, onClose, onSelect, title = 'Asset
       const response = await fetch(`${API_BASE}/api/assets/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name: editName.trim() }),
       });
 
@@ -247,9 +269,9 @@ export default function AssetLibrary({ isOpen, onClose, onSelect, title = 'Asset
                       </div>
                     ) : (
                       <p
-                        className="font-medium text-sm truncate cursor-pointer hover:text-blue-600"
-                        onClick={() => startEdit(asset)}
-                        title="Click to rename"
+                        className={`font-medium text-sm truncate ${canManageAsset(asset) ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        onClick={() => canManageAsset(asset) && startEdit(asset)}
+                        title={canManageAsset(asset) ? 'Click to rename' : asset.name}
                       >
                         {asset.name}
                       </p>
@@ -257,6 +279,11 @@ export default function AssetLibrary({ isOpen, onClose, onSelect, title = 'Asset
                     <p className="text-xs text-gray-500 truncate" title={asset.mimetype}>
                       {formatFileSize(asset.size)} - {asset.mimetype.split('/')[1].toUpperCase()}
                     </p>
+                    {asset.uploader && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5" title={`Uploaded by ${asset.uploader.name || asset.uploader.login}`}>
+                        by {asset.uploader.name || asset.uploader.login}
+                      </p>
+                    )}
 
                     {/* Actions */}
                     <div className="mt-2 flex gap-1">
@@ -273,13 +300,15 @@ export default function AssetLibrary({ isOpen, onClose, onSelect, title = 'Asset
                       >
                         Copy
                       </button>
-                      <button
-                        onClick={() => handleDelete(asset.id)}
-                        className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
-                        title="Delete"
-                      >
-                        Del
-                      </button>
+                      {canManageAsset(asset) && (
+                        <button
+                          onClick={() => handleDelete(asset.id)}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                          title="Delete"
+                        >
+                          Del
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
