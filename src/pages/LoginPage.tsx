@@ -32,13 +32,13 @@ export default function LoginPage() {
           />
           <h1 className="text-3xl font-bold text-slate-800 mb-2">COPA Apps</h1>
           <p className="text-slate-600">
-            Build and manage credential artifacts for the COPA ecosystem
+            A digital trust toolkit for the COPA ecosystem
           </p>
         </div>
 
         <div className="border-t border-gray-200 pt-6">
           <p className="text-sm text-gray-600 mb-4 text-center">
-            Sign in with your GitHub account to access the design tools.
+            Sign in with your GitHub account to access the tools.
           </p>
 
           <button
@@ -53,7 +53,16 @@ export default function LoginPage() {
         </div>
 
         <p className="text-xs text-gray-500 mt-6 text-center">
-          You need access to the COPA governance repository to use this tool.
+          You need access to the{' '}
+          <a
+            href="https://github.com/Canadian-Open-Property-Association/governance"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline"
+          >
+            COPA governance repository
+          </a>{' '}
+          to use this tool.
         </p>
       </div>
     </div>
