@@ -8,6 +8,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import authRouter from './auth.js';
 import githubRouter from './github.js';
+import catalogueRouter from './routes/catalogue.js';
 import { initAccessLogger, logAccess, queryLogs } from './accessLogger.js';
 import { requireAdmin, isAdmin } from './adminMiddleware.js';
 
@@ -128,9 +129,10 @@ if (isProduction) {
 
 app.use(express.json());
 
-// Mount auth and github routes
+// Mount auth, github, and catalogue routes
 app.use('/api/auth', authRouter);
 app.use('/api/github', githubRouter);
+app.use('/api/catalogue', catalogueRouter);
 
 // Serve static assets (uploaded files)
 app.use('/assets', express.static(ASSETS_DIR));

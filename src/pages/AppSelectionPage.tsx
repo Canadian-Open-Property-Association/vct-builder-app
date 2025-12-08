@@ -53,6 +53,18 @@ const apps: AppCard[] = [
     available: false,
   },
   {
+    id: 'data-catalogue',
+    name: 'Data Catalogue',
+    description: 'Manage and catalogue data furnishers, data types, and attributes in the ecosystem',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+    path: '/apps/data-catalogue',
+    available: true,
+  },
+  {
     id: 'badge-configurator',
     name: 'Badge Configurator',
     description: 'Design and configure visual badges derived from credentials and portfolio data',

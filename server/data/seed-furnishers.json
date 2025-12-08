@@ -1,0 +1,205 @@
+{
+  "furnishers": [
+    {
+      "id": "landcor",
+      "name": "Landcor",
+      "description": "British Columbia property data and valuation services",
+      "website": "https://landcor.com",
+      "regionsCovered": ["BC"],
+      "dataTypes": [
+        {
+          "id": "landcor-property-details",
+          "name": "Property Details",
+          "description": "Basic property information and characteristics",
+          "attributes": [
+            { "name": "pid", "displayName": "Property ID", "dataType": "string", "path": "property.pid" },
+            { "name": "use_code", "displayName": "Use Code", "dataType": "string", "path": "property_details[].use_code" },
+            { "name": "use_description", "displayName": "Use Description", "dataType": "string", "path": "property_details[].use_description" },
+            { "name": "year_built", "displayName": "Year Built", "dataType": "integer", "path": "property_details[].year_built" },
+            { "name": "effective_year", "displayName": "Effective Year", "dataType": "integer", "path": "property_details[].effective_year" },
+            { "name": "stories", "displayName": "Stories", "dataType": "number", "path": "property_details[].stories" },
+            { "name": "bedrooms", "displayName": "Bedrooms", "dataType": "integer", "path": "property_details[].bedrooms" },
+            { "name": "bathrooms_4_piece", "displayName": "4-Piece Bathrooms", "dataType": "integer", "path": "property_details[].bathrooms_4_piece" },
+            { "name": "bathrooms_3_piece", "displayName": "3-Piece Bathrooms", "dataType": "integer", "path": "property_details[].bathrooms_3_piece" },
+            { "name": "bathrooms_2_piece", "displayName": "2-Piece Bathrooms", "dataType": "integer", "path": "property_details[].bathrooms_2_piece" },
+            { "name": "total_finished_area", "displayName": "Total Finished Area", "dataType": "number", "path": "property_details[].total_finished_area" },
+            { "name": "total_basement_area", "displayName": "Total Basement Area", "dataType": "number", "path": "property_details[].total_basement_area" },
+            { "name": "finished_basement_area", "displayName": "Finished Basement Area", "dataType": "number", "path": "property_details[].finished_basement_area" }
+          ]
+        },
+        {
+          "id": "landcor-land",
+          "name": "Land Characteristics",
+          "description": "Lot size, dimensions, and features",
+          "attributes": [
+            { "name": "lot_size_sq_ft", "displayName": "Lot Size (sq ft)", "dataType": "number", "path": "property_details[].lot_size_sq_ft" },
+            { "name": "lot_width_ft", "displayName": "Lot Width (ft)", "dataType": "number", "path": "property_details[].lot_width_ft" },
+            { "name": "lot_depth_ft", "displayName": "Lot Depth (ft)", "dataType": "number", "path": "property_details[].lot_depth_ft" },
+            { "name": "corner_lot", "displayName": "Corner Lot", "dataType": "boolean", "path": "property_details[].corner_lot" },
+            { "name": "waterfront_lot", "displayName": "Waterfront Lot", "dataType": "boolean", "path": "property_details[].waterfront_lot" },
+            { "name": "prime_view_lot", "displayName": "Prime View", "dataType": "boolean", "path": "property_details[].prime_view_lot" },
+            { "name": "good_view_lot", "displayName": "Good View", "dataType": "boolean", "path": "property_details[].good_view_lot" }
+          ]
+        },
+        {
+          "id": "landcor-legal",
+          "name": "Legal Description",
+          "description": "Legal property identification",
+          "attributes": [
+            { "name": "legal_lot", "displayName": "Legal Lot", "dataType": "string", "path": "property_details[].legal_lot" },
+            { "name": "legal_block", "displayName": "Legal Block", "dataType": "string", "path": "property_details[].legal_block" },
+            { "name": "legal_plan", "displayName": "Legal Plan", "dataType": "string", "path": "property_details[].legal_plan" },
+            { "name": "legal_description", "displayName": "Legal Description", "dataType": "string", "path": "property_details[].legal_description" },
+            { "name": "roll_number", "displayName": "Roll Number", "dataType": "string", "path": "property_details[].roll_number" }
+          ]
+        },
+        {
+          "id": "landcor-valuation",
+          "name": "Valuation",
+          "description": "Property valuation and AVM data",
+          "attributes": [
+            { "name": "low_range_value", "displayName": "Low Range Value", "dataType": "number", "path": "property_details[].valuation_range[].low_range_value" },
+            { "name": "high_range_value", "displayName": "High Range Value", "dataType": "number", "path": "property_details[].valuation_range[].high_range_value" },
+            { "name": "valuation_date", "displayName": "Valuation Date", "dataType": "datetime", "path": "property_details[].valuation_range[].dateandtime" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flinks",
+      "name": "Flinks",
+      "description": "Financial data aggregation for mortgage and banking information",
+      "website": "https://flinks.com",
+      "regionsCovered": ["CA"],
+      "dataTypes": [
+        {
+          "id": "flinks-mortgage",
+          "name": "Mortgage Data",
+          "description": "Mortgage statement and balance information",
+          "attributes": [
+            { "name": "mortgage_balance", "displayName": "Mortgage Balance", "dataType": "number" },
+            { "name": "interest_rate", "displayName": "Interest Rate", "dataType": "number" },
+            { "name": "payment_amount", "displayName": "Payment Amount", "dataType": "number" },
+            { "name": "payment_frequency", "displayName": "Payment Frequency", "dataType": "string" },
+            { "name": "maturity_date", "displayName": "Maturity Date", "dataType": "date" },
+            { "name": "amortization_remaining", "displayName": "Amortization Remaining", "dataType": "integer" },
+            { "name": "lender_name", "displayName": "Lender Name", "dataType": "string" }
+          ]
+        },
+        {
+          "id": "flinks-account",
+          "name": "Account Data",
+          "description": "Bank account information",
+          "attributes": [
+            { "name": "account_number", "displayName": "Account Number", "dataType": "string" },
+            { "name": "account_type", "displayName": "Account Type", "dataType": "string" },
+            { "name": "institution_name", "displayName": "Institution Name", "dataType": "string" },
+            { "name": "current_balance", "displayName": "Current Balance", "dataType": "number" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "interac",
+      "name": "Interac",
+      "description": "Identity verification services",
+      "website": "https://interac.ca",
+      "regionsCovered": ["CA"],
+      "dataTypes": [
+        {
+          "id": "interac-identity",
+          "name": "Identity Verification",
+          "description": "Verified identity information",
+          "attributes": [
+            { "name": "first_name", "displayName": "First Name", "dataType": "string" },
+            { "name": "last_name", "displayName": "Last Name", "dataType": "string" },
+            { "name": "date_of_birth", "displayName": "Date of Birth", "dataType": "date" },
+            { "name": "address_line_1", "displayName": "Address Line 1", "dataType": "string" },
+            { "name": "city", "displayName": "City", "dataType": "string" },
+            { "name": "province", "displayName": "Province", "dataType": "string" },
+            { "name": "postal_code", "displayName": "Postal Code", "dataType": "string" },
+            { "name": "verification_status", "displayName": "Verification Status", "dataType": "string" },
+            { "name": "verification_date", "displayName": "Verification Date", "dataType": "datetime" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bc-person",
+      "name": "BC Person Credential",
+      "description": "British Columbia digital identity credential",
+      "website": "https://www2.gov.bc.ca/gov/content/governments/government-id/bcservicescardapp/digital-id",
+      "regionsCovered": ["BC"],
+      "dataTypes": [
+        {
+          "id": "bc-person-identity",
+          "name": "Personal Identity",
+          "description": "BC Services Card digital identity attributes",
+          "attributes": [
+            { "name": "given_names", "displayName": "Given Names", "dataType": "string" },
+            { "name": "family_name", "displayName": "Family Name", "dataType": "string" },
+            { "name": "date_of_birth", "displayName": "Date of Birth", "dataType": "integer", "description": "Date in dateint format" },
+            { "name": "street_address", "displayName": "Street Address", "dataType": "string" },
+            { "name": "locality", "displayName": "Locality", "dataType": "string" },
+            { "name": "region", "displayName": "Region", "dataType": "string" },
+            { "name": "postal_code", "displayName": "Postal Code", "dataType": "string" },
+            { "name": "country", "displayName": "Country", "dataType": "string" },
+            { "name": "picture", "displayName": "Picture", "dataType": "string", "description": "Base64 encoded" }
+          ]
+        },
+        {
+          "id": "bc-person-age",
+          "name": "Age Claims",
+          "description": "Age verification claims",
+          "attributes": [
+            { "name": "age_over_19", "displayName": "Age Over 19", "dataType": "boolean" },
+            { "name": "age_over_21", "displayName": "Age Over 21", "dataType": "boolean" },
+            { "name": "age_over_25", "displayName": "Age Over 25", "dataType": "boolean" },
+            { "name": "age_over_55", "displayName": "Age Over 55", "dataType": "boolean" },
+            { "name": "age_over_65", "displayName": "Age Over 65", "dataType": "boolean" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bcfsa",
+      "name": "BCFSA",
+      "description": "BC Financial Services Authority regulatory data",
+      "website": "https://www.bcfsa.ca",
+      "regionsCovered": ["BC"],
+      "dataTypes": [
+        {
+          "id": "bcfsa-property",
+          "name": "Property Registry",
+          "description": "Property registration information",
+          "attributes": [
+            { "name": "pid", "displayName": "Property ID (PID)", "dataType": "string" },
+            { "name": "title_number", "displayName": "Title Number", "dataType": "string" },
+            { "name": "registration_date", "displayName": "Registration Date", "dataType": "date" },
+            { "name": "ownership_type", "displayName": "Ownership Type", "dataType": "string" },
+            { "name": "encumbrances", "displayName": "Encumbrances", "dataType": "array" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "valet",
+      "name": "Valet API",
+      "description": "Data service API for homeowner information",
+      "regionsCovered": ["CA"],
+      "dataTypes": [
+        {
+          "id": "valet-homeowner",
+          "name": "Homeowner Data",
+          "description": "Homeowner profile information",
+          "attributes": [
+            { "name": "first_name", "displayName": "First Name", "dataType": "string" },
+            { "name": "last_name", "displayName": "Last Name", "dataType": "string" },
+            { "name": "email", "displayName": "Email", "dataType": "email" },
+            { "name": "phone", "displayName": "Phone", "dataType": "phone" }
+          ]
+        }
+      ]
+    }
+  ]
+}
