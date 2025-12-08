@@ -129,6 +129,16 @@ if (isProduction) {
 
 app.use(express.json());
 
+// Allow iframe embedding from any domain
+// Remove X-Frame-Options and set permissive Content-Security-Policy frame-ancestors
+app.use((req, res, next) => {
+  // Remove X-Frame-Options header if set by other middleware
+  res.removeHeader('X-Frame-Options');
+  // Allow embedding from any origin
+  res.setHeader('Content-Security-Policy', "frame-ancestors *");
+  next();
+});
+
 // Mount auth, github, and catalogue routes
 app.use('/api/auth', authRouter);
 app.use('/api/github', githubRouter);
