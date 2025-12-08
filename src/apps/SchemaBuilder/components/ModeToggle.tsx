@@ -8,7 +8,7 @@ import { useSchemaStore } from '../../../store/schemaStore';
 import { SchemaMode } from '../../../types/vocabulary';
 
 export default function ModeToggle() {
-  const mode = useSchemaStore((state) => state.metadata.mode);
+  const mode = useSchemaStore((state) => state.metadata.mode) || 'json-schema';
   const setMode = useSchemaStore((state) => state.setMode);
   const isDirty = useSchemaStore((state) => state.isDirty);
 

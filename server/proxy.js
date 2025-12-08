@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import authRouter from './auth.js';
 import githubRouter from './github.js';
 import catalogueRouter from './routes/catalogue.js';
-import { initAccessLogger, logAccess, queryLogs } from './accessLogger.js';
+import { initAccessLogger, logAccess, queryLogs, queryAnalytics } from './accessLogger.js';
 import { requireAdmin, isAdmin } from './adminMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -799,6 +799,28 @@ app.get('/api/admin/logs', requireProjectAuth, requireAdmin, (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error fetching access logs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get analytics data (admin only)
+app.get('/api/admin/analytics', requireProjectAuth, requireAdmin, (req, res) => {
+  try {
+    const { start_date, end_date, granularity } = req.query;
+
+    if (!start_date || !end_date) {
+      return res.status(400).json({ error: 'start_date and end_date are required' });
+    }
+
+    const result = queryAnalytics({
+      start_date,
+      end_date,
+      granularity: granularity || 'day'
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
     res.status(500).json({ error: error.message });
   }
 });

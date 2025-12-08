@@ -175,6 +175,84 @@ export const queryLogs = (filters = {}) => {
 };
 
 /**
+ * Query analytics data with aggregations
+ * @param {Object} params - Query parameters
+ * @param {string} params.start_date - Start date (ISO string)
+ * @param {string} params.end_date - End date (ISO string)
+ * @param {string} [params.granularity='day'] - Time series granularity
+ * @returns {Object} Analytics data
+ */
+export const queryAnalytics = ({ start_date, end_date, granularity = 'day' }) => {
+  if (!db) {
+    throw new Error('Access logger not initialized');
+  }
+
+  // Summary stats
+  const summaryStmt = db.prepare(`
+    SELECT
+      COUNT(*) as totalEvents,
+      SUM(CASE WHEN event_type = 'login' THEN 1 ELSE 0 END) as totalLogins,
+      SUM(CASE WHEN event_type = 'app_access' THEN 1 ELSE 0 END) as totalAppAccess,
+      COUNT(DISTINCT user_id) as uniqueUsers,
+      COUNT(DISTINCT CASE WHEN app_id IS NOT NULL THEN app_id END) as uniqueApps
+    FROM access_logs
+    WHERE timestamp BETWEEN ? AND ?
+  `);
+  const summary = summaryStmt.get(start_date, end_date);
+
+  // Time series data - group by date
+  const timeSeriesStmt = db.prepare(`
+    SELECT
+      DATE(timestamp) as date,
+      SUM(CASE WHEN event_type = 'login' THEN 1 ELSE 0 END) as logins,
+      SUM(CASE WHEN event_type = 'app_access' THEN 1 ELSE 0 END) as appAccess
+    FROM access_logs
+    WHERE timestamp BETWEEN ? AND ?
+    GROUP BY DATE(timestamp)
+    ORDER BY date ASC
+  `);
+  const timeSeriesData = timeSeriesStmt.all(start_date, end_date);
+
+  // User stats - top 20 users by activity
+  const userStatsStmt = db.prepare(`
+    SELECT
+      user_id as userId,
+      username,
+      display_name as displayName,
+      SUM(CASE WHEN event_type = 'login' THEN 1 ELSE 0 END) as loginCount,
+      SUM(CASE WHEN event_type = 'app_access' THEN 1 ELSE 0 END) as appAccessCount,
+      MAX(timestamp) as lastSeen
+    FROM access_logs
+    WHERE timestamp BETWEEN ? AND ?
+    GROUP BY user_id, username, display_name
+    ORDER BY (loginCount + appAccessCount) DESC
+    LIMIT 20
+  `);
+  const userStats = userStatsStmt.all(start_date, end_date);
+
+  // App stats - app access counts
+  const appStatsStmt = db.prepare(`
+    SELECT
+      app_id as appId,
+      app_name as appName,
+      COUNT(*) as accessCount,
+      COUNT(DISTINCT user_id) as uniqueUsers
+    FROM access_logs
+    WHERE timestamp BETWEEN ? AND ? AND event_type = 'app_access' AND app_id IS NOT NULL
+    GROUP BY app_id, app_name
+    ORDER BY accessCount DESC
+  `);
+  const appStats = appStatsStmt.all(start_date, end_date);
+
+  return {
+    summary,
+    timeSeriesData,
+    userStats,
+    appStats
+  };
+};
+
+/**
  * Get the database instance (for testing or direct access)
  * @returns {Database|null}
  */

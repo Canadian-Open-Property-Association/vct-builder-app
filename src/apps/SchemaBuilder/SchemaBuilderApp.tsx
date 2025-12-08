@@ -22,7 +22,7 @@ export default function SchemaBuilderApp() {
     fetchGovernanceDocs();
   }, [fetchGovernanceDocs]);
 
-  const isJsonLdMode = mode === 'jsonld-context';
+  const isJsonLdMode = mode === 'jsonld-context'; // mode defaults to 'json-schema'
 
   return (
     <div className="flex flex-col h-full bg-gray-100">

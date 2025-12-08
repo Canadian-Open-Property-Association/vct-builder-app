@@ -384,8 +384,15 @@ export const useSchemaStore = create<SchemaStore>()(
       loadSchema: (id: string) => {
         const project = get().savedProjects.find((p) => p.id === id);
         if (project) {
+          // Ensure mode has a default value for older projects
+          const metadata: SchemaMetadata = {
+            ...project.metadata,
+            mode: project.metadata.mode || 'json-schema',
+            contextVersion: project.metadata.contextVersion ?? 1.1,
+            protected: project.metadata.protected ?? true,
+          };
           set({
-            metadata: project.metadata,
+            metadata,
             properties: project.properties,
             currentProjectId: project.id,
             currentProjectName: project.name,
