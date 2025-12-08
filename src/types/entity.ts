@@ -13,7 +13,7 @@ export interface UserRef {
 export interface Entity {
   id: string;                    // Unique identifier (slug format: copa-entity-name)
   name: string;                  // Display name
-  type: EntityType;
+  types: EntityType[];           // Entity can have multiple types
   description?: string;
 
   // Visual Identity

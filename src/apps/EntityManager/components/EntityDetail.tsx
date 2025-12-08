@@ -1,4 +1,4 @@
-import type { Entity } from '../../../types/entity';
+import type { Entity, EntityType } from '../../../types/entity';
 import { ENTITY_TYPE_CONFIG, ENTITY_STATUS_CONFIG } from '../../../types/entity';
 
 interface EntityDetailProps {
@@ -17,8 +17,24 @@ function formatDateTime(dateString: string): string {
   });
 }
 
+function resolveLogoUri(logoUri: string | undefined): string | undefined {
+  if (!logoUri) return undefined;
+  if (logoUri.startsWith('http')) return logoUri;
+  if (logoUri.startsWith('/')) return logoUri;
+  return `/assets/${logoUri}`;
+}
+
+function getTypeColor(type: EntityType): string {
+  const colors: Record<EntityType, string> = {
+    'issuer': 'bg-blue-100 text-blue-800',
+    'data-furnisher': 'bg-green-100 text-green-800',
+    'network-partner': 'bg-purple-100 text-purple-800',
+    'service-provider': 'bg-orange-100 text-orange-800',
+  };
+  return colors[type] || 'bg-gray-100 text-gray-800';
+}
+
 export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
-  const typeConfig = ENTITY_TYPE_CONFIG[entity.type];
   const statusConfig = ENTITY_STATUS_CONFIG[entity.status];
 
   return (
@@ -30,7 +46,7 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
           <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
             {entity.logoUri ? (
               <img
-                src={entity.logoUri.startsWith('http') ? entity.logoUri : entity.logoUri.startsWith('/') ? entity.logoUri : `https://openpropertyassociation.ca/${entity.logoUri}`}
+                src={resolveLogoUri(entity.logoUri)}
                 alt={entity.name}
                 className="w-full h-full object-contain"
                 onError={(e) => {
@@ -46,10 +62,15 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
 
           <div>
             <h2 className="text-xl font-semibold text-gray-900">{entity.name}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`text-xs px-2 py-0.5 rounded-full bg-${typeConfig.color}-100 text-${typeConfig.color}-800`}>
-                {typeConfig.label}
-              </span>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {entity.types?.map((type) => (
+                <span
+                  key={type}
+                  className={`text-xs px-2 py-0.5 rounded-full ${getTypeColor(type)}`}
+                >
+                  {ENTITY_TYPE_CONFIG[type]?.label}
+                </span>
+              ))}
               <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-${statusConfig.color}-100 text-${statusConfig.color}-800`}>
                 <span className={`w-1.5 h-1.5 rounded-full bg-${statusConfig.color}-500`}></span>
                 {statusConfig.label}

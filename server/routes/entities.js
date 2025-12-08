@@ -80,9 +80,14 @@ router.get('/', (req, res) => {
     let entities = loadEntities();
 
     // Filter by types if provided (comma-separated list)
+    // Entity matches if it has ANY of the specified types
     if (types) {
       const typeList = types.split(',').map((t) => t.trim());
-      entities = entities.filter((e) => typeList.includes(e.type));
+      entities = entities.filter((e) => {
+        // Support both old 'type' field and new 'types' array
+        const entityTypes = e.types || (e.type ? [e.type] : []);
+        return entityTypes.some((t) => typeList.includes(t));
+      });
     }
 
     // Filter by search query if provided
@@ -138,10 +143,13 @@ router.post('/', requireAuth, (req, res) => {
       return slug ? `copa-${slug}` : '';
     };
 
+    // Support both 'types' array and legacy 'type' field
+    const types = req.body.types || (req.body.type ? [req.body.type] : []);
+
     const newEntity = {
       id: req.body.id || generateId(req.body.name),
       name: req.body.name,
-      type: req.body.type,
+      types: types,
       description: req.body.description || '',
       logoUri: req.body.logoUri || '',
       primaryColor: req.body.primaryColor || '',
@@ -162,8 +170,8 @@ router.post('/', requireAuth, (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    if (!newEntity.type) {
-      return res.status(400).json({ error: 'Type is required' });
+    if (!newEntity.types || newEntity.types.length === 0) {
+      return res.status(400).json({ error: 'At least one type is required' });
     }
 
     // Check for duplicate ID
@@ -192,10 +200,14 @@ router.put('/:id', requireAuth, (req, res) => {
       return res.status(404).json({ error: 'Entity not found' });
     }
 
+    // Support both 'types' array and legacy 'type' field for existing data
+    const existingTypes = entities[index].types || (entities[index].type ? [entities[index].type] : []);
+    const newTypes = req.body.types ?? (req.body.type ? [req.body.type] : existingTypes);
+
     const updatedEntity = {
       ...entities[index],
       name: req.body.name ?? entities[index].name,
-      type: req.body.type ?? entities[index].type,
+      types: newTypes,
       description: req.body.description ?? entities[index].description,
       logoUri: req.body.logoUri ?? entities[index].logoUri,
       primaryColor: req.body.primaryColor ?? entities[index].primaryColor,
@@ -210,6 +222,9 @@ router.put('/:id', requireAuth, (req, res) => {
         name: req.session.user.name || undefined,
       },
     };
+
+    // Remove legacy 'type' field if it exists
+    delete updatedEntity.type;
 
     entities[index] = updatedEntity;
     saveEntities(entities);

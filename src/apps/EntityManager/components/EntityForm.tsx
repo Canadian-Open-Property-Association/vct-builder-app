@@ -14,7 +14,7 @@ type FormData = Omit<Entity, 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedB
 const defaultFormData: FormData = {
   id: '',
   name: '',
-  type: 'issuer',
+  types: [],
   description: '',
   logoUri: '',
   primaryColor: '',
@@ -51,7 +51,7 @@ export default function EntityForm({ entityId, onClose }: EntityFormProps) {
         setFormData({
           id: entity.id,
           name: entity.name,
-          type: entity.type,
+          types: entity.types || [],
           description: entity.description || '',
           logoUri: entity.logoUri || '',
           primaryColor: entity.primaryColor || '',
@@ -81,6 +81,15 @@ export default function EntityForm({ entityId, onClose }: EntityFormProps) {
     setShowAssetLibrary(false);
   };
 
+  const handleTypeToggle = (type: EntityType) => {
+    setFormData((prev) => ({
+      ...prev,
+      types: prev.types.includes(type)
+        ? prev.types.filter((t) => t !== type)
+        : [...prev.types, type],
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -89,6 +98,10 @@ export default function EntityForm({ entityId, onClose }: EntityFormProps) {
     try {
       if (!formData.name.trim()) {
         throw new Error('Name is required');
+      }
+
+      if (formData.types.length === 0) {
+        throw new Error('At least one type is required');
       }
 
       if (isEditing) {
@@ -167,42 +180,70 @@ export default function EntityForm({ entityId, onClose }: EntityFormProps) {
                 </div>
               </div>
 
-              {/* Type and Status Row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Type <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="type"
-                    value={formData.type}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {(Object.keys(ENTITY_TYPE_CONFIG) as EntityType[]).map((type) => (
-                      <option key={type} value={type}>
-                        {ENTITY_TYPE_CONFIG[type].label}
-                      </option>
-                    ))}
-                  </select>
+              {/* Types (multi-select checkboxes) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Types <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {(Object.keys(ENTITY_TYPE_CONFIG) as EntityType[]).map((type) => (
+                    <label
+                      key={type}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        formData.types.includes(type)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.types.includes(type)}
+                        onChange={() => handleTypeToggle(type)}
+                        className="sr-only"
+                      />
+                      <span
+                        className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          formData.types.includes(type)
+                            ? 'bg-blue-500 border-blue-500'
+                            : 'border-gray-400'
+                        }`}
+                      >
+                        {formData.types.includes(type) && (
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="text-sm font-medium">{ENTITY_TYPE_CONFIG[type].label}</span>
+                    </label>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {(Object.keys(ENTITY_STATUS_CONFIG) as EntityStatus[]).map((status) => (
-                      <option key={status} value={status}>
-                        {ENTITY_STATUS_CONFIG[status].label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Select all types that apply to this entity
+                </p>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {(Object.keys(ENTITY_STATUS_CONFIG) as EntityStatus[]).map((status) => (
+                    <option key={status} value={status}>
+                      {ENTITY_STATUS_CONFIG[status].label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Description */}
@@ -230,7 +271,13 @@ export default function EntityForm({ entityId, onClose }: EntityFormProps) {
                   <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden flex-shrink-0">
                     {formData.logoUri ? (
                       <img
-                        src={formData.logoUri}
+                        src={
+                          formData.logoUri.startsWith('http')
+                            ? formData.logoUri
+                            : formData.logoUri.startsWith('/')
+                              ? formData.logoUri
+                              : `/assets/${formData.logoUri}`
+                        }
                         alt="Logo preview"
                         className="w-full h-full object-contain"
                         onError={(e) => {

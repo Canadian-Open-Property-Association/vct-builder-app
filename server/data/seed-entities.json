@@ -3,7 +3,7 @@
     {
       "id": "copa-cornerstone",
       "name": "Cornerstone Platform Inc.",
-      "type": "issuer",
+      "types": ["issuer"],
       "description": "Platform operator for the COPA credential ecosystem",
       "logoUri": "entities/logos/cornerstone.png",
       "primaryColor": "#1a365d",
@@ -13,8 +13,8 @@
     {
       "id": "copa-sutton-group",
       "name": "Sutton Group",
-      "type": "network-partner",
-      "description": "Real estate network partner in the COPA ecosystem",
+      "types": ["network-partner", "issuer"],
+      "description": "Real estate network partner and credential issuer in the COPA ecosystem",
       "logoUri": "entities/logos/sutton-group.png",
       "primaryColor": "#c41e3a",
       "website": "https://sutton.com",
@@ -23,7 +23,7 @@
     {
       "id": "copa-landcor",
       "name": "Landcor Data Corporation",
-      "type": "data-furnisher",
+      "types": ["data-furnisher"],
       "description": "Authorized data furnisher for property valuation and real estate market analytics",
       "logoUri": "entities/logos/landcor.png",
       "primaryColor": "#2d5a27",
@@ -33,7 +33,7 @@
     {
       "id": "copa-interac",
       "name": "Interac Corp.",
-      "type": "data-furnisher",
+      "types": ["data-furnisher"],
       "description": "Authorized data furnisher for identity verification services",
       "logoUri": "entities/logos/interac.png",
       "primaryColor": "#f9a825",
@@ -43,7 +43,7 @@
     {
       "id": "copa-cove",
       "name": "Cove Insurance",
-      "type": "data-furnisher",
+      "types": ["data-furnisher"],
       "description": "Authorized data furnisher for insurance data and coverage verification",
       "logoUri": "entities/logos/cove.png",
       "primaryColor": "#0077b6",
