@@ -6,9 +6,11 @@ import {
   PROPERTY_TYPE_LABELS,
   STRING_FORMAT_LABELS,
 } from '../../../types/schema';
+import VocabTermSelector from './VocabTermSelector';
 
 export default function PropertyEditor() {
-  const { properties, selectedPropertyId, updateProperty } = useSchemaStore();
+  const { properties, selectedPropertyId, updateProperty, metadata } = useSchemaStore();
+  const isJsonLdMode = metadata.mode === 'jsonld-context';
 
   // Find selected property recursively
   const findProperty = (props: SchemaProperty[], id: string): SchemaProperty | null => {
@@ -129,6 +131,73 @@ export default function PropertyEditor() {
           Required
         </label>
       </div>
+
+      {/* JSON-LD Vocabulary Mapping - only shown in JSON-LD mode */}
+      {isJsonLdMode && (
+        <div className="border-t pt-4 space-y-4">
+          <h4 className="text-sm font-semibold text-gray-700">Vocabulary Mapping</h4>
+          <VocabTermSelector
+            selectedTermId={selectedProperty.jsonLd?.vocabTermId}
+            selectedComplexTypeId={selectedProperty.jsonLd?.complexTypeId}
+            onTermSelect={(termId) =>
+              handleUpdate({
+                jsonLd: {
+                  ...selectedProperty.jsonLd,
+                  vocabTermId: termId,
+                  complexTypeId: undefined, // Clear complex type when term is selected
+                },
+              })
+            }
+            onComplexTypeSelect={(typeId) =>
+              handleUpdate({
+                jsonLd: {
+                  ...selectedProperty.jsonLd,
+                  complexTypeId: typeId,
+                  vocabTermId: undefined, // Clear term when complex type is selected
+                },
+                // When selecting a complex type, set property type to object
+                type: typeId ? 'object' : selectedProperty.type,
+              })
+            }
+          />
+
+          {/* Custom @id override */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Custom @id (optional)
+            </label>
+            <input
+              type="text"
+              value={selectedProperty.jsonLd?.customId || ''}
+              onChange={(e) =>
+                handleUpdate({
+                  jsonLd: {
+                    ...selectedProperty.jsonLd,
+                    customId: e.target.value || undefined,
+                  },
+                })
+              }
+              placeholder="e.g., https://example.org/vocab#myTerm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Override the vocabulary term IRI for this property
+            </p>
+          </div>
+
+          {/* Show mapping preview */}
+          {(selectedProperty.jsonLd?.vocabTermId || selectedProperty.jsonLd?.complexTypeId) && (
+            <div className="bg-blue-50 p-3 rounded-md">
+              <p className="text-xs font-medium text-blue-700 mb-1">Mapping Preview:</p>
+              <code className="text-xs text-blue-800 break-all">
+                {selectedProperty.jsonLd?.complexTypeId
+                  ? `"${selectedProperty.name}": { "@id": "vocab:${selectedProperty.jsonLd.vocabTermId || selectedProperty.name}", "@type": "...#${selectedProperty.jsonLd.complexTypeId}" }`
+                  : `"${selectedProperty.name}": "vocab:${selectedProperty.jsonLd?.vocabTermId || selectedProperty.name}"`}
+              </code>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Type-specific constraints */}
       {selectedProperty.type === 'string' && (

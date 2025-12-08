@@ -893,6 +893,140 @@ app.get('/api/governance-docs', async (req, res) => {
   }
 });
 
+// ============================================
+// Vocabulary API (fetch external vocabularies for JSON-LD Context mode)
+// ============================================
+
+// Helper: Transform raw vocabulary data to internal format
+function transformVocabulary(data, sourceUrl) {
+  // Generate an ID from the URL
+  const urlObj = new URL(sourceUrl);
+  const vocabId = urlObj.pathname.split('/').pop()?.replace('.jsonld', '') || 'unknown-vocab';
+
+  const vocabulary = {
+    id: data.id || vocabId,
+    name: data.name || data['@context']?.['@vocab'] || 'Unknown Vocabulary',
+    description: data.description || `Vocabulary from ${urlObj.hostname}`,
+    url: sourceUrl,
+    contextUrl: data['@context']?.['@base'] || sourceUrl.replace('vocab.jsonld', 'context.jsonld'),
+    version: data.version || '1.0',
+    terms: [],
+    complexTypes: [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  // If the vocabulary has a specific terms array, use it
+  if (data.terms && Array.isArray(data.terms)) {
+    vocabulary.terms = data.terms.map(term => ({
+      id: term.id,
+      label: term.label || term.id,
+      description: term.description || '',
+      '@id': term['@id'] || `vocab:${term.id}`,
+      allowedTypes: term.allowedTypes || ['string'],
+      isComplexType: term.isComplexType || false,
+    }));
+  } else {
+    // Otherwise, try to parse from JSON-LD @context format
+    // This handles vocabularies like the one from adarshnb-19.github.io
+    const context = data['@context'] || data;
+
+    for (const [key, value] of Object.entries(context)) {
+      // Skip JSON-LD keywords
+      if (key.startsWith('@')) continue;
+
+      if (typeof value === 'string') {
+        // Simple term mapping (e.g., "name": "ext:name")
+        vocabulary.terms.push({
+          id: key,
+          label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+          description: '',
+          '@id': value,
+          allowedTypes: ['string'],
+          isComplexType: false,
+        });
+      } else if (typeof value === 'object' && value !== null) {
+        // Complex type with nested @context
+        if (value['@context']) {
+          vocabulary.complexTypes.push({
+            id: key,
+            label: key,
+            description: '',
+            '@id': value['@id'] || `#${key}`,
+            allowedProperties: Object.keys(value['@context']).filter(k => !k.startsWith('@')),
+          });
+        } else if (value['@id']) {
+          // Term with explicit @id (might be a type reference)
+          const isComplexType = value['@type'] !== undefined;
+          vocabulary.terms.push({
+            id: key,
+            label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+            description: '',
+            '@id': value['@id'],
+            allowedTypes: isComplexType ? ['object'] : ['string'],
+            isComplexType,
+          });
+        }
+      }
+    }
+  }
+
+  // Parse complex types if provided
+  if (data.complexTypes && Array.isArray(data.complexTypes)) {
+    vocabulary.complexTypes = data.complexTypes.map(type => ({
+      id: type.id,
+      label: type.label || type.id,
+      description: type.description || '',
+      '@id': type['@id'],
+      allowedProperties: type.allowedProperties || [],
+    }));
+  }
+
+  return vocabulary;
+}
+
+// Fetch and parse vocabulary from external URL
+app.get('/api/vocabulary/fetch', async (req, res) => {
+  try {
+    const { url } = req.query;
+
+    if (!url) {
+      return res.status(400).json({ error: 'URL parameter is required' });
+    }
+
+    // Validate URL format
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ error: 'Invalid URL format' });
+    }
+
+    // Fetch vocabulary
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/ld+json, application/json',
+        'User-Agent': 'copa-apps-vocab-loader',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Failed to fetch vocabulary: ${response.statusText}`,
+      });
+    }
+
+    const vocabData = await response.json();
+
+    // Transform to our internal Vocabulary format
+    const vocabulary = transformVocabulary(vocabData, url);
+
+    res.json(vocabulary);
+  } catch (error) {
+    console.error('Error fetching vocabulary:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Hash generation endpoint (existing)
 app.get('/hash', async (req, res) => {
   const { url } = req.query;

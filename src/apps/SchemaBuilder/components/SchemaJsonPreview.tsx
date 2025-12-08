@@ -1,17 +1,26 @@
 import { useMemo } from 'react';
 import { useSchemaStore } from '../../../store/schemaStore';
-import { toJsonSchema } from '../../../types/schema';
+import { toJsonSchema, toJsonLdContext } from '../../../types/schema';
+import { useVocabularyStore } from '../../../store/vocabularyStore';
 
 export default function SchemaJsonPreview() {
   // Subscribe to metadata and properties so component re-renders when they change
   const metadata = useSchemaStore((state) => state.metadata);
   const properties = useSchemaStore((state) => state.properties);
+  const getSelectedVocab = useVocabularyStore((state) => state.getSelectedVocab);
 
-  // Generate JSON Schema whenever metadata or properties change
+  const isJsonLdMode = metadata.mode === 'jsonld-context';
+
+  // Generate JSON Schema or JSON-LD Context based on mode
   const schemaJson = useMemo(() => {
+    if (isJsonLdMode) {
+      const vocabulary = getSelectedVocab();
+      const context = toJsonLdContext(metadata, properties, vocabulary);
+      return JSON.stringify(context, null, 2);
+    }
     const schema = toJsonSchema(metadata, properties);
     return JSON.stringify(schema, null, 2);
-  }, [metadata, properties]);
+  }, [metadata, properties, isJsonLdMode, getSelectedVocab]);
 
   const handleCopy = async () => {
     try {

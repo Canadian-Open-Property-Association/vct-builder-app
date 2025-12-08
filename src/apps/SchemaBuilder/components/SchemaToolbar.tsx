@@ -14,6 +14,7 @@ export default function SchemaToolbar() {
     currentProjectId,
     isDirty,
     savedProjects,
+    metadata,
     newSchema,
     saveSchema,
     loadSchema,
@@ -21,6 +22,8 @@ export default function SchemaToolbar() {
     exportSchema,
     importSchema,
   } = useSchemaStore();
+
+  const isJsonLdMode = metadata.mode === 'jsonld-context';
 
   const handleNew = () => {
     if (isDirty && !confirm('You have unsaved changes. Create new schema anyway?')) {
@@ -72,7 +75,9 @@ export default function SchemaToolbar() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${currentProjectName.replace(/\s+/g, '-').toLowerCase()}-schema.json`;
+    // Use different file extension/suffix based on mode
+    const suffix = isJsonLdMode ? '-context.jsonld' : '-schema.json';
+    a.download = `${currentProjectName.replace(/\s+/g, '-').toLowerCase()}${suffix}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

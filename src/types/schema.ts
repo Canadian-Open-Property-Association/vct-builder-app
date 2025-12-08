@@ -1,5 +1,13 @@
 // JSON Schema Builder TypeScript Interfaces
 // Based on JSON Schema Draft 2020-12 and W3C VC JSON Schema spec
+// Extended to support JSON-LD Context generation mode
+
+import {
+  SchemaMode,
+  JsonLdPropertyExtension,
+  Vocabulary,
+  DEFAULT_CONTEXT_URL,
+} from './vocabulary';
 
 // Supported JSON Schema types
 export type SchemaPropertyType = 'string' | 'integer' | 'number' | 'boolean' | 'object' | 'array';
@@ -37,6 +45,9 @@ export interface SchemaProperty {
 
   // Object nested properties
   properties?: SchemaProperty[];
+
+  // JSON-LD specific fields (used in jsonld-context mode)
+  jsonLd?: JsonLdPropertyExtension;
 }
 
 // Schema metadata
@@ -46,6 +57,14 @@ export interface SchemaMetadata {
   description: string;           // Schema description
   governanceDocUrl?: string;     // x-governance-doc URL
   governanceDocName?: string;    // Display name of linked governance doc
+
+  // JSON-LD Context mode fields
+  mode: SchemaMode;              // 'json-schema' or 'jsonld-context'
+  vocabUrl?: string;             // URL to vocabulary file
+  contextUrl?: string;           // Base URL for @context references
+  contextVersion?: number;       // @version (default 1.1)
+  protected?: boolean;           // @protected flag
+  ocaUrl?: string;               // OCA/VCT branding URL (included in JSON-LD output)
 }
 
 // Standard VC properties (auto-included in every schema)
@@ -139,6 +158,9 @@ export interface SchemaStore {
   loadSchema: (id: string) => void;
   deleteSchema: (id: string) => Promise<void>;
 
+  // Mode management
+  setMode: (mode: SchemaMode) => void;
+
   // Import/Export
   exportSchema: () => string;
   importSchema: (json: string) => void;
@@ -170,6 +192,13 @@ export const createDefaultMetadata = (): SchemaMetadata => ({
   description: '',
   governanceDocUrl: undefined,
   governanceDocName: undefined,
+  // JSON-LD mode defaults
+  mode: 'json-schema',
+  vocabUrl: undefined,
+  contextUrl: undefined,
+  contextVersion: 1.1,
+  protected: true,
+  ocaUrl: undefined,
 });
 
 // Create default empty property
@@ -338,4 +367,155 @@ export const STRING_FORMAT_LABELS: Record<StringFormat, string> = {
   hostname: 'Hostname',
   ipv4: 'IPv4 Address',
   ipv6: 'IPv6 Address',
+};
+
+/**
+ * Convert internal schema representation to JSON-LD Context format
+ * This is used when mode is 'jsonld-context'
+ */
+export const toJsonLdContext = (
+  metadata: SchemaMetadata,
+  properties: SchemaProperty[],
+  vocabulary: Vocabulary | null
+): object => {
+  const contextUrl = metadata.contextUrl || DEFAULT_CONTEXT_URL;
+  const vocabUrl = metadata.vocabUrl || (vocabulary?.url) || 'https://openpropertyassociation.ca/vocab.jsonld';
+
+  /**
+   * Build property mappings for a set of properties
+   */
+  const buildPropertyMappings = (props: SchemaProperty[]): Record<string, unknown> => {
+    const mappings: Record<string, unknown> = {};
+
+    for (const prop of props) {
+      if (!prop.name) continue;
+
+      const vocabTermId = prop.jsonLd?.vocabTermId;
+      const complexTypeId = prop.jsonLd?.complexTypeId;
+      const customId = prop.jsonLd?.customId;
+
+      if (complexTypeId) {
+        // Complex type reference - property points to another type
+        mappings[prop.name] = {
+          '@id': customId || `vocab:${vocabTermId || prop.name}`,
+          '@type': `${contextUrl}#${complexTypeId}`,
+        };
+      } else if (vocabTermId) {
+        // Simple vocab term reference
+        mappings[prop.name] = customId || `vocab:${vocabTermId}`;
+      } else {
+        // Fallback to property name
+        mappings[prop.name] = customId || `vocab:${prop.name}`;
+      }
+    }
+
+    return mappings;
+  };
+
+  /**
+   * Build type definitions for complex types (objects with nested properties)
+   * Each complex type gets its own @context block
+   */
+  const buildTypeDefinitions = (props: SchemaProperty[]): Record<string, unknown> => {
+    const types: Record<string, unknown> = {};
+
+    const processProperty = (prop: SchemaProperty) => {
+      // If this property is marked as a complex type and has nested properties
+      if (prop.jsonLd?.complexTypeId && prop.properties && prop.properties.length > 0) {
+        const typeId = prop.jsonLd.complexTypeId;
+
+        // Build the nested context for this type
+        const nestedMappings = buildPropertyMappings(prop.properties);
+
+        types[typeId] = {
+          '@id': `${contextUrl}#${typeId}`,
+          '@context': {
+            '@version': metadata.contextVersion || 1.1,
+            'id': '@id',
+            'type': '@type',
+            ...nestedMappings,
+          },
+        };
+
+        // Recursively process nested properties that might also be complex types
+        for (const nested of prop.properties) {
+          processProperty(nested);
+        }
+      }
+
+      // Also check if property type is object with properties (implicit complex type)
+      if (prop.type === 'object' && prop.properties && prop.properties.length > 0 && !prop.jsonLd?.complexTypeId) {
+        // Create a type name from the property name (PascalCase)
+        const typeId = prop.name.charAt(0).toUpperCase() + prop.name.slice(1);
+        const nestedMappings = buildPropertyMappings(prop.properties);
+
+        types[typeId] = {
+          '@id': `${contextUrl}#${typeId}`,
+          '@context': {
+            '@version': metadata.contextVersion || 1.1,
+            'id': '@id',
+            'type': '@type',
+            ...nestedMappings,
+          },
+        };
+
+        // Recursively process nested properties
+        for (const nested of prop.properties) {
+          processProperty(nested);
+        }
+      }
+    };
+
+    for (const prop of props) {
+      processProperty(prop);
+    }
+
+    return types;
+  };
+
+  // Build type definitions for nested complex types
+  const typeDefinitions = buildTypeDefinitions(properties);
+
+  // Build root property mappings
+  const rootMappings = buildPropertyMappings(properties);
+
+  // Build the full @context object
+  const contextContent: Record<string, unknown> = {
+    '@version': metadata.contextVersion || 1.1,
+    '@protected': metadata.protected ?? true,
+  };
+
+  // Add OCA/VCT reference if provided
+  if (metadata.ocaUrl) {
+    contextContent['oca'] = metadata.ocaUrl;
+  }
+
+  // Add vocabulary reference
+  contextContent['vocab'] = vocabUrl;
+
+  // Add type definitions (complex types with their own @context)
+  Object.assign(contextContent, typeDefinitions);
+
+  // If there's a root type (based on schema title), wrap root properties in it
+  if (metadata.title) {
+    const rootTypeName = metadata.title
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .split(/\s+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join('');
+
+    contextContent[rootTypeName] = {
+      '@id': `${contextUrl}#${rootTypeName}`,
+      '@context': {
+        '@version': metadata.contextVersion || 1.1,
+        'id': '@id',
+        'type': '@type',
+        ...rootMappings,
+      },
+    };
+  }
+
+  return {
+    '@context': contextContent,
+  };
 };

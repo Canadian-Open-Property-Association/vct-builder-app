@@ -9,7 +9,10 @@ import {
   createDefaultMetadata,
   createDefaultProperty,
   toJsonSchema,
+  toJsonLdContext,
 } from '../types/schema';
+import { SchemaMode } from '../types/vocabulary';
+import { useVocabularyStore } from './vocabularyStore';
 import { getCurrentUserId, useAuthStore } from './authStore';
 
 const generateId = () => crypto.randomUUID();
@@ -420,9 +423,25 @@ export const useSchemaStore = create<SchemaStore>()(
         }
       },
 
+      // Mode management
+      setMode: (mode: SchemaMode) =>
+        set((state) => ({
+          metadata: { ...state.metadata, mode },
+          isDirty: true,
+        })),
+
       // Import/Export
       exportSchema: () => {
         const { metadata, properties } = get();
+
+        // Mode-aware export
+        if (metadata.mode === 'jsonld-context') {
+          const vocabulary = useVocabularyStore.getState().getSelectedVocab();
+          const context = toJsonLdContext(metadata, properties, vocabulary);
+          return JSON.stringify(context, null, 2);
+        }
+
+        // Default: JSON Schema
         const schema = toJsonSchema(metadata, properties);
         return JSON.stringify(schema, null, 2);
       },
@@ -438,6 +457,13 @@ export const useSchemaStore = create<SchemaStore>()(
             description: schema.description || '',
             governanceDocUrl: schema['x-governance-doc'],
             governanceDocName: undefined,
+            // Default to json-schema mode for imports
+            mode: 'json-schema',
+            vocabUrl: undefined,
+            contextUrl: undefined,
+            contextVersion: 1.1,
+            protected: true,
+            ocaUrl: undefined,
           };
 
           // Parse credentialSubject properties
