@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import AppSelectionPage from './pages/AppSelectionPage';
 import AuthGuard from './components/Auth/AuthGuard';
 import AdminGuard from './components/Auth/AdminGuard';
@@ -38,8 +39,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public route - Login */}
+        {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth-callback" element={<AuthCallbackPage />} />
 
         {/* Protected routes */}
         <Route

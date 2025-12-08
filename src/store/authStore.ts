@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isInIframe } from '../hooks/useIframeMode';
 
 export interface GitHubUser {
   id: number;
@@ -15,6 +16,7 @@ interface AuthState {
   error: string | null;
   checkAuth: () => Promise<void>;
   login: () => void;
+  loginPopup: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -62,8 +64,57 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   login: () => {
+    // If in iframe, use popup login to avoid redirect issues
+    if (isInIframe()) {
+      useAuthStore.getState().loginPopup();
+      return;
+    }
     // Redirect to GitHub OAuth
     window.location.href = `${API_BASE}/api/auth/login`;
+  },
+
+  loginPopup: async () => {
+    // Open OAuth in a popup window
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const popup = window.open(
+      `${API_BASE}/api/auth/login?popup=true`,
+      'github-oauth',
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+    );
+
+    if (!popup) {
+      set({ error: 'Popup blocked. Please allow popups for this site.' });
+      return;
+    }
+
+    // Listen for message from popup
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'OAUTH_CALLBACK') {
+        window.removeEventListener('message', handleMessage);
+        popup.close();
+
+        if (event.data.success) {
+          // Re-check auth to load user data
+          await useAuthStore.getState().checkAuth();
+        } else {
+          set({ error: event.data.error || 'Authentication failed' });
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Also handle popup being closed manually
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handleMessage);
+      }
+    }, 500);
   },
 
   logout: async () => {
