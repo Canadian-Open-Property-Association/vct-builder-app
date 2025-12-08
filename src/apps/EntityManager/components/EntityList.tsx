@@ -135,11 +135,6 @@ export default function EntityList({ onEditEntity }: EntityListProps) {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${getTypeColor(entity.type)}`}>
                       {ENTITY_TYPE_CONFIG[entity.type]?.label}
                     </span>
-                    {entity.credentialTypes && entity.credentialTypes.length > 0 && (
-                      <span className="text-xs text-gray-400">
-                        {entity.credentialTypes.length} credential type{entity.credentialTypes.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
                   </div>
                 </div>
 
