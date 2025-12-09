@@ -3,6 +3,7 @@ import { useSchemaStore } from '../../store/schemaStore';
 import { useAppTracking } from '../../hooks/useAppTracking';
 import SchemaToolbar from './components/SchemaToolbar';
 import MetadataPanel from './components/MetadataPanel';
+import StandardClaimsPanel from './components/StandardClaimsPanel';
 import GovernanceDocsList from './components/GovernanceDocsList';
 import VocabularyManager from './components/VocabularyManager';
 import OcaSelector from './components/OcaSelector';
@@ -44,10 +45,13 @@ export default function SchemaBuilderApp() {
               <OcaSelector />
             </>
           ) : (
-            /* JSON Schema Mode: Governance Docs */
-            <div className="border-b border-gray-200">
-              <GovernanceDocsList />
-            </div>
+            <>
+              {/* JSON Schema Mode: Standard Claims + Governance Docs */}
+              <StandardClaimsPanel />
+              <div className="border-b border-gray-200">
+                <GovernanceDocsList />
+              </div>
+            </>
           )}
 
           {/* Property Tree Section */}
