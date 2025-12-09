@@ -22,7 +22,9 @@ const catalogueApi = {
       credentials: 'include',
     });
     if (!response.ok) throw new Error('Failed to fetch data types');
-    return response.json();
+    const data = await response.json();
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : [];
   },
 
   async getDataType(id: string): Promise<DataType> {
@@ -205,7 +207,9 @@ const catalogueApi = {
       credentials: 'include',
     });
     if (!response.ok) throw new Error('Failed to fetch categories');
-    return response.json();
+    const data = await response.json();
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : [];
   },
 
   async createCategory(category: Partial<DataTypeCategory>): Promise<DataTypeCategory> {
@@ -514,6 +518,11 @@ export const useDataCatalogueStore = create<DataCatalogueState>((set, get) => ({
     const { dataTypes, categories } = get();
     const result: CategoryWithTypes[] = [];
 
+    // Guard against non-array dataTypes (e.g., API error or loading state)
+    if (!Array.isArray(dataTypes)) {
+      return result;
+    }
+
     // Group data types by category
     const grouped = new Map<string, DataType[]>();
     for (const dt of dataTypes) {
@@ -524,8 +533,10 @@ export const useDataCatalogueStore = create<DataCatalogueState>((set, get) => ({
       grouped.get(catId)!.push(dt);
     }
 
-    // Sort categories and create result
-    const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
+    // Sort categories and create result (guard against non-array)
+    const sortedCategories = Array.isArray(categories)
+      ? [...categories].sort((a, b) => a.order - b.order)
+      : [];
     for (const cat of sortedCategories) {
       const types = grouped.get(cat.id) || [];
       if (types.length > 0) {
