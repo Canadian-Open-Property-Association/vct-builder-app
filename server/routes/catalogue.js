@@ -843,7 +843,7 @@ router.get('/search', (req, res) => {
     const matchedDataTypes = dataTypes.filter(dt =>
       dt.name.toLowerCase().includes(query) ||
       dt.description?.toLowerCase().includes(query) ||
-      dt.properties.some(p =>
+      (dt.properties || []).some(p =>
         p.name.toLowerCase().includes(query) ||
         p.displayName?.toLowerCase().includes(query) ||
         p.description?.toLowerCase().includes(query)
@@ -884,8 +884,9 @@ router.get('/stats', (req, res) => {
     const dataTypes = loadDataTypes();
     const categories = loadCategories();
 
-    const totalProperties = dataTypes.reduce((sum, dt) => sum + dt.properties.length, 0);
-    const totalSources = dataTypes.reduce((sum, dt) => sum + dt.sources.length, 0);
+    // Handle both new format (with properties/sources) and legacy format
+    const totalProperties = dataTypes.reduce((sum, dt) => sum + (dt.properties?.length || 0), 0);
+    const totalSources = dataTypes.reduce((sum, dt) => sum + (dt.sources?.length || 0), 0);
 
     const categoryCounts = {};
     for (const dt of dataTypes) {
