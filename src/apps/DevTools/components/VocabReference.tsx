@@ -194,7 +194,7 @@ export default function VocabReference() {
             </p>
             <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
               <li>User clicks "Add from Vocabulary" in Schema Builder</li>
-              <li>Modal fetches DataTypes from <code className="bg-gray-100 px-1.5 py-0.5 rounded">/api/catalogue/v2/data-types</code></li>
+              <li>Modal fetches DataTypes from <code className="bg-gray-100 px-1.5 py-0.5 rounded">/api/catalogue/data-types</code></li>
               <li>User browses and selects properties</li>
               <li>Properties added with <code className="bg-gray-100 px-1.5 py-0.5 rounded">@id: "copa:{'{property_name}'}"</code></li>
             </ol>
@@ -246,54 +246,27 @@ export default function VocabReference() {
 
       {/* API Reference */}
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">Vocabulary API Endpoints</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border border-gray-200 rounded-lg">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-2 border-b">Method</th>
-                <th className="text-left px-4 py-2 border-b">Endpoint</th>
-                <th className="text-left px-4 py-2 border-b">Description</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              <tr>
-                <td className="px-4 py-2">
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">GET</span>
-                </td>
-                <td className="px-4 py-2 font-mono text-xs">/api/catalogue/v2/categories</td>
-                <td className="px-4 py-2 text-gray-600">List all vocabulary categories</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2">
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">GET</span>
-                </td>
-                <td className="px-4 py-2 font-mono text-xs">/api/catalogue/v2/data-types</td>
-                <td className="px-4 py-2 text-gray-600">List all DataTypes (vocabulary domains)</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2">
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">GET</span>
-                </td>
-                <td className="px-4 py-2 font-mono text-xs">/api/catalogue/v2/data-types/:id</td>
-                <td className="px-4 py-2 text-gray-600">Get DataType with all properties</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2">
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">GET</span>
-                </td>
-                <td className="px-4 py-2 font-mono text-xs">/api/catalogue/v2/search?q=query</td>
-                <td className="px-4 py-2 text-gray-600">Search DataTypes and properties</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2">
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">GET</span>
-                </td>
-                <td className="px-4 py-2 font-mono text-xs">/api/catalogue/v2/stats</td>
-                <td className="px-4 py-2 text-gray-600">Get catalogue statistics</td>
-              </tr>
-            </tbody>
-          </table>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Vocabulary API</h2>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-600 mb-3">
+            The Data Catalogue API provides endpoints for accessing vocabulary terms, categories, and search functionality.
+          </p>
+          <div className="flex gap-3">
+            <a
+              href="/api/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Open Swagger UI
+            </a>
+            <code className="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg font-mono">
+              Base: /api/catalogue
+            </code>
+          </div>
         </div>
       </section>
     </div>

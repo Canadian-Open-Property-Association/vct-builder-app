@@ -1,7 +1,7 @@
 /**
  * Catalogue API Service
  *
- * Provides access to the Data Catalogue V2 API for vocabulary data.
+ * Provides access to the Data Catalogue API for vocabulary data.
  * The Data Catalogue serves as the authoritative vocabulary source.
  */
 
@@ -13,7 +13,7 @@ const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
  * Fetch all categories from the catalogue
  */
 export async function fetchCategories(): Promise<DataTypeCategory[]> {
-  const response = await fetch(`${API_BASE}/api/catalogue/v2/categories`, {
+  const response = await fetch(`${API_BASE}/api/catalogue/categories`, {
     credentials: 'include',
   });
 
@@ -29,7 +29,7 @@ export async function fetchCategories(): Promise<DataTypeCategory[]> {
  * Optionally filter by category
  */
 export async function fetchDataTypes(category?: string): Promise<DataType[]> {
-  const url = new URL(`${API_BASE}/api/catalogue/v2/data-types`, window.location.origin);
+  const url = new URL(`${API_BASE}/api/catalogue/data-types`, window.location.origin);
   if (category) {
     url.searchParams.set('category', category);
   }
@@ -49,7 +49,7 @@ export async function fetchDataTypes(category?: string): Promise<DataType[]> {
  * Fetch a single DataType by ID with all properties
  */
 export async function fetchDataType(id: string): Promise<DataType> {
-  const response = await fetch(`${API_BASE}/api/catalogue/v2/data-types/${id}`, {
+  const response = await fetch(`${API_BASE}/api/catalogue/data-types/${id}`, {
     credentials: 'include',
   });
 
@@ -68,7 +68,7 @@ export async function searchCatalogue(query: string): Promise<{ dataTypes: DataT
     return { dataTypes: [] };
   }
 
-  const url = new URL(`${API_BASE}/api/catalogue/v2/search`, window.location.origin);
+  const url = new URL(`${API_BASE}/api/catalogue/search`, window.location.origin);
   url.searchParams.set('q', query);
 
   const response = await fetch(url.toString(), {
@@ -92,7 +92,7 @@ export async function fetchCatalogueStats(): Promise<{
   totalCategories: number;
   categoryCounts: Record<string, number>;
 }> {
-  const response = await fetch(`${API_BASE}/api/catalogue/v2/stats`, {
+  const response = await fetch(`${API_BASE}/api/catalogue/stats`, {
     credentials: 'include',
   });
 
