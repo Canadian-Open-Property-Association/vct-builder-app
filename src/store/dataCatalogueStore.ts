@@ -208,8 +208,14 @@ const catalogueApi = {
     });
     if (!response.ok) throw new Error('Failed to fetch categories');
     const data = await response.json();
-    // Ensure we always return an array
-    return Array.isArray(data) ? data : [];
+    // Handle both array and {categories: [...]} response formats
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && Array.isArray(data.categories)) {
+      return data.categories;
+    }
+    return [];
   },
 
   async createCategory(category: Partial<DataTypeCategory>): Promise<DataTypeCategory> {
