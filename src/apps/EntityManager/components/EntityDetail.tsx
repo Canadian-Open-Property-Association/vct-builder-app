@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Entity, EntityType, FurnisherDataSchema } from '../../../types/entity';
 import { ENTITY_TYPE_CONFIG, ENTITY_STATUS_CONFIG } from '../../../types/entity';
 import { useEntityStore } from '../../../store/entityStore';
@@ -43,6 +43,17 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
   const { updateEntity } = useEntityStore();
   const isDataFurnisher = entity.types?.includes('data-furnisher');
   const [activeTab, setActiveTab] = useState<'about' | 'data-schema'>('about');
+
+  // Track the current entity ID to reset tab only when switching entities
+  const currentEntityIdRef = useRef(entity.id);
+
+  // Only reset to 'about' tab when switching to a different entity
+  useEffect(() => {
+    if (currentEntityIdRef.current !== entity.id) {
+      currentEntityIdRef.current = entity.id;
+      setActiveTab('about');
+    }
+  }, [entity.id]);
 
   const handleUpdateSchema = async (schema: FurnisherDataSchema) => {
     try {
