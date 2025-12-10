@@ -123,11 +123,6 @@ export default function SchemaBuilderApp() {
   if (!isEditing) {
     return (
       <div className="flex flex-col h-full bg-gray-100">
-        {/* Minimal Toolbar */}
-        <div className="bg-gray-100 border-b border-gray-200 px-4 py-2">
-          <h1 className="text-lg font-semibold text-gray-800">Schema Builder</h1>
-        </div>
-
         {/* Welcome Screen */}
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-lg">
