@@ -121,11 +121,7 @@ export default function VocabTypeDetail({ onEdit }: VocabTypeDetailProps) {
                   <tr
                     key={prop.id}
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={(e) => {
-                      const target = e.target as HTMLElement;
-                      if (target.closest('button')) return;
-                      setPreviewProperty(prop);
-                    }}
+                    onClick={() => setPreviewProperty(prop)}
                   >
                     <td className="px-4 py-2">
                       <div>
@@ -170,9 +166,9 @@ export default function VocabTypeDetail({ onEdit }: VocabTypeDetailProps) {
                         <span className="text-xs text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-2 text-right">
                       <button
-                        onClick={() => setPreviewProperty(prop)}
+                        onClick={(e) => { e.stopPropagation(); setPreviewProperty(prop); }}
                         className="text-gray-400 hover:text-gray-600 p-1"
                         title="View JSON"
                       >
@@ -181,7 +177,7 @@ export default function VocabTypeDetail({ onEdit }: VocabTypeDetailProps) {
                         </svg>
                       </button>
                       <button
-                        onClick={() => { setEditingProperty(prop); setShowPropertyForm(true); }}
+                        onClick={(e) => { e.stopPropagation(); setEditingProperty(prop); setShowPropertyForm(true); }}
                         className="text-gray-400 hover:text-blue-600 p-1"
                         title="Edit"
                       >
@@ -190,7 +186,7 @@ export default function VocabTypeDetail({ onEdit }: VocabTypeDetailProps) {
                         </svg>
                       </button>
                       <button
-                        onClick={() => handleDeleteProperty(prop.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteProperty(prop.id); }}
                         className="text-gray-400 hover:text-red-600 p-1 ml-1"
                         title="Delete"
                       >

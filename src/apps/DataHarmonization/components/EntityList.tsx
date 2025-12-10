@@ -1,4 +1,5 @@
 import { useHarmonizationStore } from '../../../store/harmonizationStore';
+import { migrateDataSchema } from '../../../types/entity';
 
 function resolveLogoUri(logoUri: string | undefined): string | undefined {
   if (!logoUri) return undefined;
@@ -16,6 +17,12 @@ export default function EntityList() {
 
   const furnishers = getDataFurnishers();
 
+  // Helper to count fields across all sources
+  const getFieldCount = (entity: typeof furnishers[0]) => {
+    const schema = migrateDataSchema(entity.dataSchema);
+    return schema.sources?.reduce((acc, source) => acc + (source.fields?.length || 0), 0) || 0;
+  };
+
   if (furnishers.length === 0) {
     return (
       <div className="p-4 text-center text-gray-500 text-sm">
@@ -32,7 +39,7 @@ export default function EntityList() {
     <ul className="divide-y divide-gray-100">
       {furnishers.map((entity) => {
         const isSelected = selectedEntityId === entity.id;
-        const fieldCount = entity.dataSchema?.fields?.length || 0;
+        const fieldCount = getFieldCount(entity);
 
         return (
           <li
@@ -40,9 +47,12 @@ export default function EntityList() {
             onClick={() => selectEntity(isSelected ? null : entity.id)}
             className={`px-4 py-3 cursor-pointer transition-colors ${
               isSelected
-                ? 'bg-purple-50 border-l-2 border-purple-500'
-                : 'hover:bg-gray-50 border-l-2 border-transparent'
+                ? 'bg-purple-50'
+                : 'hover:bg-gray-50'
             }`}
+            style={{
+              borderLeft: isSelected ? '3px solid #8b5cf6' : '3px solid transparent',
+            }}
           >
             <div className="flex items-center gap-3">
               {/* Logo */}

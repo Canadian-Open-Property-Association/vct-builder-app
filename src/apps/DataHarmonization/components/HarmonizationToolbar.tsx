@@ -10,14 +10,7 @@ export default function HarmonizationToolbar({ onCreateMapping }: HarmonizationT
   const canCreateMapping = selectedEntityId && selectedVocabTypeId;
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-gray-900">Data Harmonization</h1>
-        <span className="text-sm text-gray-500">
-          Map furnisher fields to COPA vocabulary
-        </span>
-      </div>
-
+    <div className="flex items-center justify-end px-4 py-3 bg-white border-b border-gray-200">
       <div className="flex items-center gap-2">
         <button
           onClick={onCreateMapping}
