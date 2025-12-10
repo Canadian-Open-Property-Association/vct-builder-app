@@ -9,6 +9,69 @@ interface EntityDetailProps {
   onEdit: () => void;
 }
 
+// Inline editable section component
+interface EditableSectionProps {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  editContent?: React.ReactNode;
+  isEditing: boolean;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  className?: string;
+}
+
+function EditableSection({
+  title,
+  icon,
+  children,
+  editContent,
+  isEditing,
+  onEdit,
+  onSave,
+  onCancel,
+  className = '',
+}: EditableSectionProps) {
+  return (
+    <div className={`bg-gray-50 rounded-lg p-4 ${className}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          {icon}
+          {title}
+        </h3>
+        {isEditing ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onCancel}
+              className="text-xs px-2 py-1 text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSave}
+              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onEdit}
+            className="text-gray-400 hover:text-blue-600 p-1 transition-colors"
+            title={`Edit ${title}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {isEditing && editContent ? editContent : children}
+    </div>
+  );
+}
+
 function formatDateTime(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleString('en-US', {
@@ -37,12 +100,16 @@ function getTypeColor(type: EntityType): string {
   return colors[type] || 'bg-gray-100 text-gray-800';
 }
 
-export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
+export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailProps) {
   const statusConfig = ENTITY_STATUS_CONFIG[entity.status];
   const brandColour = entity.primaryColor || '#1a365d';
   const { updateEntity } = useEntityStore();
   const isDataFurnisher = entity.types?.includes('data-furnisher');
   const [activeTab, setActiveTab] = useState<'about' | 'data-schema'>('about');
+
+  // Inline editing states
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<Entity>>({});
 
   // Track the current entity ID to reset tab only when switching entities
   const currentEntityIdRef = useRef(entity.id);
@@ -52,6 +119,7 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
     if (currentEntityIdRef.current !== entity.id) {
       currentEntityIdRef.current = entity.id;
       setActiveTab('about');
+      setEditingSection(null);
     }
   }, [entity.id]);
 
@@ -63,39 +131,45 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
     }
   };
 
+  const startEditing = (section: string) => {
+    setEditingSection(section);
+    setEditFormData({ ...entity });
+  };
+
+  const cancelEditing = () => {
+    setEditingSection(null);
+    setEditFormData({});
+  };
+
+  const saveSection = async () => {
+    try {
+      await updateEntity(entity.id, editFormData);
+      setEditingSection(null);
+      setEditFormData({});
+    } catch (error) {
+      console.error('Failed to update entity:', error);
+    }
+  };
+
+  const updateFormField = (field: keyof Entity, value: string | undefined) => {
+    setEditFormData(prev => ({ ...prev, [field]: value || undefined }));
+  };
+
   return (
     <div>
       {/* Banner Header with Brand Colour */}
       <div
-        className="h-32 relative"
+        className="h-20 relative"
         style={{ backgroundColor: brandColour }}
       >
         {/* Gradient overlay for depth */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-black/20" />
-
-        {/* Entity name on banner with white text */}
-        <div className="absolute bottom-14 left-6 right-24">
-          <h2 className="text-xl font-semibold text-white drop-shadow-sm truncate">
-            {entity.name}
-          </h2>
-        </div>
-
-        {/* Edit button positioned on banner */}
-        <button
-          onClick={onEdit}
-          className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          Edit
-        </button>
       </div>
 
       {/* Content with logo overlapping banner */}
       <div className="px-6 pb-6">
-        {/* Logo and badges - positioned to overlap banner */}
-        <div className="flex items-end gap-4 -mt-10 relative z-10 mb-4">
+        {/* Logo, Name, and badges - positioned to overlap banner */}
+        <div className="flex items-end gap-4 -mt-8 relative z-10 mb-6">
           {/* Logo */}
           <div
             className="w-16 h-16 rounded-xl bg-white shadow-lg border-4 border-white flex items-center justify-center overflow-hidden flex-shrink-0"
@@ -119,7 +193,11 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
             )}
           </div>
 
-          <div className="pb-1">
+          {/* Name and badges to the right of logo */}
+          <div className="flex-1 min-w-0 pb-1">
+            <h2 className="text-xl font-semibold text-gray-900 truncate mb-2">
+              {entity.name}
+            </h2>
             <div className="flex items-center gap-2 flex-wrap">
               {entity.types?.map((type) => (
                 <span
@@ -139,7 +217,7 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
 
         {/* Description */}
         {entity.description && (
-          <p className="text-sm text-gray-600 mb-4 max-w-2xl">{entity.description}</p>
+          <p className="text-sm text-gray-600 mb-6 max-w-2xl">{entity.description}</p>
         )}
 
         {/* Tabs - only show if data furnisher */}
@@ -181,8 +259,57 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-6">
             {/* Contact & Web Section */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Contact & Web</h3>
+            <EditableSection
+              title="Contact & Web"
+              isEditing={editingSection === 'contact'}
+              onEdit={() => startEditing('contact')}
+              onSave={saveSection}
+              onCancel={cancelEditing}
+              editContent={
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Website</label>
+                    <input
+                      type="url"
+                      value={editFormData.website || ''}
+                      onChange={(e) => updateFormField('website', e.target.value)}
+                      placeholder="https://example.com"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Contact Person</label>
+                    <input
+                      type="text"
+                      value={editFormData.contactName || ''}
+                      onChange={(e) => updateFormField('contactName', e.target.value)}
+                      placeholder="John Doe"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={editFormData.contactEmail || ''}
+                      onChange={(e) => updateFormField('contactEmail', e.target.value)}
+                      placeholder="contact@example.com"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      value={editFormData.contactPhone || ''}
+                      onChange={(e) => updateFormField('contactPhone', e.target.value)}
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              }
+            >
               <div className="space-y-3">
                 {entity.website && (
                   <div>
@@ -229,11 +356,62 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
                   <p className="text-sm text-gray-400 italic">No contact information</p>
                 )}
               </div>
-            </div>
+            </EditableSection>
 
             {/* Technical Identity Section */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Technical Identity</h3>
+            <EditableSection
+              title="Technical Identity"
+              isEditing={editingSection === 'technical'}
+              onEdit={() => startEditing('technical')}
+              onSave={saveSection}
+              onCancel={cancelEditing}
+              editContent={
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Entity ID</label>
+                    <p className="text-sm font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded">{entity.id}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Decentralized Identifier (DID)</label>
+                    <input
+                      type="text"
+                      value={editFormData.did || ''}
+                      onChange={(e) => updateFormField('did', e.target.value)}
+                      placeholder="did:web:example.com"
+                      className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Logo URI</label>
+                    <input
+                      type="text"
+                      value={editFormData.logoUri || ''}
+                      onChange={(e) => updateFormField('logoUri', e.target.value)}
+                      placeholder="/assets/logo.png or https://..."
+                      className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Brand Colour</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editFormData.primaryColor || '#1a365d'}
+                        onChange={(e) => updateFormField('primaryColor', e.target.value)}
+                        className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={editFormData.primaryColor || ''}
+                        onChange={(e) => updateFormField('primaryColor', e.target.value)}
+                        placeholder="#1a365d"
+                        className="flex-1 px-3 py-1.5 text-sm font-mono border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              }
+            >
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-gray-500">Entity ID</label>
@@ -263,8 +441,11 @@ export default function EntityDetail({ entity, onEdit }: EntityDetailProps) {
                     </div>
                   </div>
                 )}
+                {!entity.did && !entity.logoUri && !entity.primaryColor && (
+                  <p className="text-sm text-gray-400 italic">No technical details configured</p>
+                )}
               </div>
-            </div>
+            </EditableSection>
           </div>
 
           {/* Regions Covered - Only shown for Data Furnishers with regions */}
