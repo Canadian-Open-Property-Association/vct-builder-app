@@ -6,8 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { fetchCategories, fetchDataTypes, fetchCatalogueStats } from '../../../services/catalogueApi';
-import { DataType, DataTypeCategory } from '../../../types/catalogue';
+import { fetchCategories, fetchDataTypes, fetchCatalogueStats, DataType, DataTypeCategory } from '../../../services/catalogueApi';
 
 interface CatalogueStats {
   totalDataTypes: number;

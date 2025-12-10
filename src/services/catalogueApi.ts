@@ -1,19 +1,27 @@
 /**
- * Catalogue API Service
+ * Dictionary API Service
  *
- * Provides access to the Data Catalogue API for vocabulary data.
- * The Data Catalogue serves as the authoritative vocabulary source.
+ * Provides access to the Data Dictionary API for vocabulary data.
+ * The Data Dictionary serves as the authoritative vocabulary source.
+ *
+ * NOTE: Function names preserved for backwards compatibility with Schema Builder
+ * and DevTools components that depend on this API.
  */
 
-import { DataType, DataTypeCategory, Property } from '../types/catalogue';
+import type { VocabType, VocabCategory, VocabProperty } from '../types/dictionary';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
+// Re-export types with old names for backwards compatibility
+export type DataType = VocabType;
+export type DataTypeCategory = VocabCategory;
+export type Property = VocabProperty;
+
 /**
- * Fetch all categories from the catalogue
+ * Fetch all categories from the dictionary
  */
-export async function fetchCategories(): Promise<DataTypeCategory[]> {
-  const response = await fetch(`${API_BASE}/api/catalogue/v2/categories`, {
+export async function fetchCategories(): Promise<VocabCategory[]> {
+  const response = await fetch(`${API_BASE}/api/dictionary/categories`, {
     credentials: 'include',
   });
 
@@ -21,15 +29,16 @@ export async function fetchCategories(): Promise<DataTypeCategory[]> {
     throw new Error(`Failed to fetch categories: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.categories || [];
 }
 
 /**
- * Fetch all DataTypes (vocabulary terms)
+ * Fetch all VocabTypes (vocabulary terms)
  * Optionally filter by category
  */
-export async function fetchDataTypes(category?: string): Promise<DataType[]> {
-  const url = new URL(`${API_BASE}/api/catalogue/v2/data-types`, window.location.origin);
+export async function fetchDataTypes(category?: string): Promise<VocabType[]> {
+  const url = new URL(`${API_BASE}/api/dictionary/vocab-types`, window.location.origin);
   if (category) {
     url.searchParams.set('category', category);
   }
@@ -39,36 +48,37 @@ export async function fetchDataTypes(category?: string): Promise<DataType[]> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch data types: ${response.statusText}`);
+    throw new Error(`Failed to fetch vocab types: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
 }
 
 /**
- * Fetch a single DataType by ID with all properties
+ * Fetch a single VocabType by ID with all properties
  */
-export async function fetchDataType(id: string): Promise<DataType> {
-  const response = await fetch(`${API_BASE}/api/catalogue/v2/data-types/${id}`, {
+export async function fetchDataType(id: string): Promise<VocabType> {
+  const response = await fetch(`${API_BASE}/api/dictionary/vocab-types/${id}`, {
     credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch data type: ${response.statusText}`);
+    throw new Error(`Failed to fetch vocab type: ${response.statusText}`);
   }
 
   return response.json();
 }
 
 /**
- * Search DataTypes and properties
+ * Search VocabTypes and properties
  */
-export async function searchCatalogue(query: string): Promise<{ dataTypes: DataType[] }> {
+export async function searchCatalogue(query: string): Promise<{ dataTypes: VocabType[] }> {
   if (query.length < 2) {
     return { dataTypes: [] };
   }
 
-  const url = new URL(`${API_BASE}/api/catalogue/v2/search`, window.location.origin);
+  const url = new URL(`${API_BASE}/api/dictionary/search`, window.location.origin);
   url.searchParams.set('q', query);
 
   const response = await fetch(url.toString(), {
@@ -76,14 +86,16 @@ export async function searchCatalogue(query: string): Promise<{ dataTypes: DataT
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to search catalogue: ${response.statusText}`);
+    throw new Error(`Failed to search dictionary: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  // Map vocabTypes to dataTypes for backwards compatibility
+  return { dataTypes: data.vocabTypes || [] };
 }
 
 /**
- * Get catalogue statistics
+ * Get dictionary statistics
  */
 export async function fetchCatalogueStats(): Promise<{
   totalDataTypes: number;
@@ -92,7 +104,7 @@ export async function fetchCatalogueStats(): Promise<{
   totalCategories: number;
   categoryCounts: Record<string, number>;
 }> {
-  const response = await fetch(`${API_BASE}/api/catalogue/v2/stats`, {
+  const response = await fetch(`${API_BASE}/api/dictionary/stats`, {
     credentials: 'include',
   });
 
@@ -100,14 +112,22 @@ export async function fetchCatalogueStats(): Promise<{
     throw new Error(`Failed to fetch stats: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  // Map new field names to old for backwards compatibility
+  return {
+    totalDataTypes: data.totalVocabTypes || 0,
+    totalProperties: data.totalProperties || 0,
+    totalSources: 0, // No longer tracked in dictionary
+    totalCategories: Object.keys(data.categoryCounts || {}).length,
+    categoryCounts: data.categoryCounts || {},
+  };
 }
 
 /**
- * Convert a Catalogue Property to a Schema Builder property format
+ * Convert a Dictionary Property to a Schema Builder property format
  */
 export function cataloguePropertyToSchemaProperty(
-  prop: Property,
+  prop: VocabProperty,
   index: number
 ): {
   id: string;
@@ -117,10 +137,11 @@ export function cataloguePropertyToSchemaProperty(
   type: string;
   required: boolean;
 } {
-  // Map catalogue value types to JSON Schema types
+  // Map dictionary value types to JSON Schema types
   const typeMap: Record<string, string> = {
     string: 'string',
     number: 'number',
+    integer: 'integer',
     boolean: 'boolean',
     date: 'string',
     datetime: 'string',

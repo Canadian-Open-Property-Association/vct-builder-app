@@ -95,9 +95,9 @@ export default function SchemaJsonPreview() {
 
       // Mode-specific validation
       if (isJsonLdMode) {
-        // JSON-LD Context validation
-        if (!parsed['@context']) {
-          setParseError('Invalid JSON-LD: missing @context');
+        // JSON-LD Credential Schema validation - must have credentialSubject with properties
+        if (!parsed.properties?.credentialSubject) {
+          setParseError('Invalid schema: missing credentialSubject');
           return;
         }
         // Only update if JSON actually changed

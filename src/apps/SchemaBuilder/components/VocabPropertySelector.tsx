@@ -6,8 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { fetchDataTypes, fetchCategories, cataloguePropertyToSchemaProperty } from '../../../services/catalogueApi';
-import { DataType, DataTypeCategory } from '../../../types/catalogue';
+import { fetchDataTypes, fetchCategories, cataloguePropertyToSchemaProperty, DataType, DataTypeCategory } from '../../../services/catalogueApi';
 import { useSchemaStore } from '../../../store/schemaStore';
 
 interface VocabPropertySelectorProps {

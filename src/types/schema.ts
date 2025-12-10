@@ -592,198 +592,217 @@ const getSchemaPrefix = (title: string): string => {
 };
 
 /**
- * Convert internal schema representation to JSON-LD Context format
+ * Convert internal schema representation to JSON-LD Credential Schema format
  * This is used when mode is 'jsonld-context'
+ *
+ * Produces a JSON Schema (Draft 2020-12) for validating W3C Verifiable Credentials
+ * that use JSON-LD format with @context references.
  */
 export const toJsonLdContext = (
   metadata: SchemaMetadata,
   properties: SchemaProperty[],
-  vocabulary: Vocabulary | null
+  _vocabulary: Vocabulary | null
 ): object => {
   // Generate context URL dynamically from category + credentialName, or fallback
   const contextUrl = metadata.contextUrl ||
     generateContextUrl(metadata.title, metadata.category, metadata.credentialName) ||
     DEFAULT_CONTEXT_URL;
 
-  // Vocab URL - use copa: prefix since vocabulary comes from Data Catalogue
-  const vocabUrl = metadata.vocabUrl || (vocabulary?.url) || 'https://openpropertyassociation.ca/vocab';
-
-  // Schema prefix for nested type naming (e.g., "HomeCredential")
-  const schemaPrefix = metadata.title ? getSchemaPrefix(metadata.title) : '';
+  // Generate schema $id URL
+  const schemaId = metadata.schemaId ||
+    generateSchemaId(metadata.title, metadata.category, metadata.credentialName);
 
   /**
-   * Build property mappings for a set of properties
+   * Build JSON Schema property definition from SchemaProperty
    */
-  const buildPropertyMappings = (props: SchemaProperty[]): Record<string, unknown> => {
-    const mappings: Record<string, unknown> = {};
+  const buildPropertySchema = (prop: SchemaProperty): object => {
+    const schema: Record<string, unknown> = {
+      title: prop.title || prop.name,
+      type: prop.type,
+    };
 
-    for (const prop of props) {
-      if (!prop.name) continue;
+    if (prop.description) {
+      schema.description = prop.description;
+    }
 
-      const vocabTermId = prop.jsonLd?.vocabTermId;
-      const complexTypeId = prop.jsonLd?.complexTypeId;
-      const customId = prop.jsonLd?.customId;
+    // String constraints
+    if (prop.type === 'string') {
+      if (prop.minLength !== undefined) schema.minLength = prop.minLength;
+      if (prop.maxLength !== undefined) schema.maxLength = prop.maxLength;
+      if (prop.format) schema.format = prop.format;
+      if (prop.pattern) schema.pattern = prop.pattern;
+      if (prop.enum && prop.enum.length > 0) schema.enum = prop.enum;
+    }
 
-      if (complexTypeId) {
-        // Complex type reference - property points to another type
-        mappings[prop.name] = {
-          '@id': customId || `vocab:${vocabTermId || prop.name}`,
-          '@type': `${contextUrl}#${complexTypeId}`,
-        };
-      } else if (vocabTermId) {
-        // Simple vocab term reference
-        mappings[prop.name] = customId || `vocab:${vocabTermId}`;
-      } else {
-        // Fallback to property name (use copa: prefix for canonical vocab terms)
-        mappings[prop.name] = customId || `copa:${prop.name}`;
+    // Number/Integer constraints
+    if (prop.type === 'integer' || prop.type === 'number') {
+      if (prop.minimum !== undefined) schema.minimum = prop.minimum;
+      if (prop.maximum !== undefined) schema.maximum = prop.maximum;
+      if (prop.exclusiveMinimum !== undefined) schema.exclusiveMinimum = prop.exclusiveMinimum;
+      if (prop.exclusiveMaximum !== undefined) schema.exclusiveMaximum = prop.exclusiveMaximum;
+    }
+
+    // Array constraints
+    if (prop.type === 'array') {
+      if (prop.minItems !== undefined) schema.minItems = prop.minItems;
+      if (prop.maxItems !== undefined) schema.maxItems = prop.maxItems;
+      if (prop.uniqueItems) schema.uniqueItems = prop.uniqueItems;
+      if (prop.items) {
+        schema.items = buildPropertySchema(prop.items);
       }
     }
 
-    return mappings;
-  };
+    // Object nested properties
+    if (prop.type === 'object' && prop.properties && prop.properties.length > 0) {
+      const nestedProps: Record<string, object> = {};
+      const nestedRequired: string[] = [];
 
-  /**
-   * Build type definitions for complex types (objects with nested properties)
-   * Each complex type gets its own @context block
-   * Type names follow pattern: {SchemaName}{PropertyName} (e.g., HomeCredentialPropertyAddress)
-   */
-  const buildTypeDefinitions = (props: SchemaProperty[]): Record<string, unknown> => {
-    const types: Record<string, unknown> = {};
-
-    const processProperty = (prop: SchemaProperty) => {
-      // If this property is marked as a complex type and has nested properties
-      if (prop.jsonLd?.complexTypeId && prop.properties && prop.properties.length > 0) {
-        const typeId = prop.jsonLd.complexTypeId;
-
-        // Build the nested context for this type
-        const nestedMappings = buildPropertyMappings(prop.properties);
-
-        types[typeId] = {
-          '@id': `${contextUrl}#${typeId}`,
-          '@context': {
-            '@version': metadata.contextVersion || 1.1,
-            'id': '@id',
-            'type': '@type',
-            ...nestedMappings,
-          },
-        };
-
-        // Recursively process nested properties that might also be complex types
-        for (const nested of prop.properties) {
-          processProperty(nested);
+      for (const nested of prop.properties) {
+        nestedProps[nested.name] = buildPropertySchema(nested);
+        if (nested.required) {
+          nestedRequired.push(nested.name);
         }
       }
 
-      // Also check if property type is object with properties (implicit complex type)
-      if (prop.type === 'object' && prop.properties && prop.properties.length > 0 && !prop.jsonLd?.complexTypeId) {
-        // Create type name with schema prefix: {SchemaName}{PropertyName}
-        // e.g., "HomeCredentialPropertyAddress" for "property_address" in "Home Credential" schema
-        const propPascal = toPascalCase(prop.name);
-        const typeId = schemaPrefix ? `${schemaPrefix}${propPascal}` : propPascal;
-        const nestedMappings = buildPropertyMappings(prop.properties);
-
-        types[typeId] = {
-          '@id': `${contextUrl}#${typeId}`,
-          '@context': {
-            '@version': metadata.contextVersion || 1.1,
-            'id': '@id',
-            'type': '@type',
-            ...nestedMappings,
-          },
-        };
-
-        // Update the property mapping to reference this type
-        // (This is needed so the root mapping points to the correct type)
-
-        // Recursively process nested properties
-        for (const nested of prop.properties) {
-          processProperty(nested);
-        }
-      }
-    };
-
-    for (const prop of props) {
-      processProperty(prop);
-    }
-
-    return types;
-  };
-
-  /**
-   * Build property mappings with proper @type references for nested objects
-   */
-  const buildRootMappingsWithTypes = (props: SchemaProperty[]): Record<string, unknown> => {
-    const mappings: Record<string, unknown> = {};
-
-    for (const prop of props) {
-      if (!prop.name) continue;
-
-      const vocabTermId = prop.jsonLd?.vocabTermId;
-      const complexTypeId = prop.jsonLd?.complexTypeId;
-      const customId = prop.jsonLd?.customId;
-
-      // Check if this is an object with nested properties (needs @type reference)
-      if (prop.type === 'object' && prop.properties && prop.properties.length > 0) {
-        const propPascal = toPascalCase(prop.name);
-        const typeId = complexTypeId || (schemaPrefix ? `${schemaPrefix}${propPascal}` : propPascal);
-
-        mappings[prop.name] = {
-          '@id': customId || `copa:${vocabTermId || prop.name}`,
-          '@type': `${contextUrl}#${typeId}`,
-        };
-      } else if (complexTypeId) {
-        // Explicit complex type reference
-        mappings[prop.name] = {
-          '@id': customId || `copa:${vocabTermId || prop.name}`,
-          '@type': `${contextUrl}#${complexTypeId}`,
-        };
-      } else if (vocabTermId) {
-        // Simple vocab term reference
-        mappings[prop.name] = customId || `copa:${vocabTermId}`;
-      } else {
-        // Fallback to property name
-        mappings[prop.name] = customId || `copa:${prop.name}`;
+      schema.properties = nestedProps;
+      if (nestedRequired.length > 0) {
+        schema.required = nestedRequired;
       }
     }
 
-    return mappings;
+    return schema;
   };
 
-  // Build type definitions for nested complex types
-  const typeDefinitions = buildTypeDefinitions(properties);
+  // Build credentialSubject properties
+  const credentialSubjectProps: Record<string, object> = {};
+  const credentialSubjectRequired: string[] = [];
 
-  // Build root property mappings (with @type references for nested objects)
-  const rootMappings = buildRootMappingsWithTypes(properties);
-
-  // Build the full @context object
-  const contextContent: Record<string, unknown> = {
-    '@version': metadata.contextVersion || 1.1,
-    '@protected': metadata.protected ?? true,
-  };
-
-  // Add vocabulary references
-  contextContent['vocab'] = vocabUrl;
-  contextContent['copa'] = 'https://openpropertyassociation.ca/vocab#';
-
-  // Add type definitions (complex types with their own @context)
-  Object.assign(contextContent, typeDefinitions);
-
-  // If there's a root type (based on schema title), wrap root properties in it
-  if (metadata.title) {
-    const rootTypeName = getSchemaPrefix(metadata.title);
-
-    contextContent[rootTypeName] = {
-      '@id': `${contextUrl}#${rootTypeName}`,
-      '@context': {
-        '@version': metadata.contextVersion || 1.1,
-        'id': '@id',
-        'type': '@type',
-        ...rootMappings,
-      },
-    };
+  for (const prop of properties) {
+    if (prop.name) {
+      credentialSubjectProps[prop.name] = buildPropertySchema(prop);
+      if (prop.required) {
+        credentialSubjectRequired.push(prop.name);
+      }
+    }
   }
 
-  return {
-    '@context': contextContent,
+  // Credential type name (PascalCase from title)
+  const credentialTypeName = metadata.title ? getSchemaPrefix(metadata.title) : 'Credential';
+
+  // Build the full JSON-LD Credential Schema
+  const schema: Record<string, unknown> = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: schemaId,
+    title: metadata.title || 'Verifiable Credential',
+    description: metadata.description || `JSON Schema for ${metadata.title || 'Verifiable Credential'}`,
+    type: 'object',
+    required: ['@context', 'type', 'credentialSubject'],
+    properties: {
+      '@context': {
+        title: 'JSON-LD Context',
+        description: 'The JSON-LD context for semantic interoperability.',
+        oneOf: [
+          {
+            type: 'array',
+            items: {
+              oneOf: [
+                { type: 'string', format: 'uri' },
+                { type: 'object' },
+              ],
+            },
+            contains: {
+              const: 'https://www.w3.org/2018/credentials/v1',
+            },
+          },
+          {
+            type: 'string',
+            const: 'https://www.w3.org/2018/credentials/v1',
+          },
+        ],
+      },
+      type: {
+        title: 'Credential Type',
+        description: 'The type(s) of this credential.',
+        oneOf: [
+          {
+            type: 'array',
+            items: { type: 'string' },
+            contains: { const: 'VerifiableCredential' },
+          },
+          {
+            type: 'string',
+            const: 'VerifiableCredential',
+          },
+        ],
+      },
+      id: {
+        title: 'Credential ID',
+        description: 'Unique identifier for this credential instance.',
+        type: 'string',
+        format: 'uri',
+      },
+      issuer: {
+        title: 'Issuer',
+        description: 'The entity that issued this credential.',
+        oneOf: [
+          { type: 'string', format: 'uri' },
+          {
+            type: 'object',
+            required: ['id'],
+            properties: {
+              id: { type: 'string', format: 'uri' },
+              name: { type: 'string' },
+            },
+          },
+        ],
+      },
+      issuanceDate: {
+        title: 'Issuance Date',
+        description: 'The date and time when the credential was issued.',
+        type: 'string',
+        format: 'date-time',
+      },
+      expirationDate: {
+        title: 'Expiration Date',
+        description: 'The date and time when the credential expires.',
+        type: 'string',
+        format: 'date-time',
+      },
+      credentialSubject: {
+        title: 'Credential Subject',
+        description: 'Claims about the subject of the credential.',
+        type: 'object',
+        properties: {
+          id: {
+            title: 'Subject ID',
+            description: 'Identifier for the subject of the credential.',
+            type: 'string',
+            format: 'uri',
+          },
+          ...credentialSubjectProps,
+        },
+        ...(credentialSubjectRequired.length > 0 ? { required: credentialSubjectRequired } : {}),
+      },
+      proof: {
+        title: 'Proof',
+        description: 'Digital proof that makes this credential verifiable.',
+        type: 'object',
+      },
+    },
   };
+
+  // Add governance doc reference if present
+  if (metadata.governanceDocUrl) {
+    schema['x-governance-doc'] = metadata.governanceDocUrl;
+  }
+
+  // Add context URL reference for documentation
+  if (contextUrl) {
+    schema['x-context-url'] = contextUrl;
+  }
+
+  // Add credential type hint
+  schema['x-credential-type'] = credentialTypeName;
+
+  return schema;
 };
