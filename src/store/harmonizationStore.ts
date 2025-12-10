@@ -134,6 +134,7 @@ interface HarmonizationState {
   // Helpers
   getDataFurnishers: () => Entity[];
   getMappingsForEntity: (entityId: string) => FieldMapping[];
+  getMappingsForSource: (entityId: string, sourceId: string) => FieldMapping[];
   getMappingsForVocabType: (vocabTypeId: string) => FieldMapping[];
   getMappingsForSelection: () => FieldMapping[];
 }
@@ -253,6 +254,12 @@ export const useHarmonizationStore = create<HarmonizationState>((set, get) => ({
   getMappingsForEntity: (entityId) => {
     const { mappings } = get();
     return mappings.filter(m => m.entityId === entityId);
+  },
+
+  // Helper: Get mappings for a specific source within an entity
+  getMappingsForSource: (entityId: string, sourceId: string) => {
+    const { mappings } = get();
+    return mappings.filter(m => m.entityId === entityId && m.sourceId === sourceId);
   },
 
   // Helper: Get mappings for a specific vocab type

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Entity, EntityType, FurnisherDataSchema } from '../../../types/entity';
-import { ENTITY_TYPE_CONFIG, ENTITY_STATUS_CONFIG } from '../../../types/entity';
+import { ENTITY_TYPE_CONFIG, ENTITY_STATUS_CONFIG, migrateDataSchema } from '../../../types/entity';
 import { useEntityStore } from '../../../store/entityStore';
-import FurnisherDataSchemaSection from './FurnisherDataSchemaSection';
+import DataSourcesSection from './DataSourcesSection';
 
 interface EntityDetailProps {
   entity: Entity;
@@ -100,6 +100,9 @@ function getTypeColor(type: EntityType): string {
   return colors[type] || 'bg-gray-100 text-gray-800';
 }
 
+// All available entity types
+const ALL_ENTITY_TYPES: EntityType[] = ['issuer', 'data-furnisher', 'network-partner', 'service-provider'];
+
 export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailProps) {
   const statusConfig = ENTITY_STATUS_CONFIG[entity.status];
   const brandColour = entity.primaryColor || '#1a365d';
@@ -111,6 +114,10 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Entity>>({});
 
+  // Entity types editing state
+  const [editingTypes, setEditingTypes] = useState(false);
+  const [selectedTypes, setSelectedTypes] = useState<EntityType[]>(entity.types || []);
+
   // Track the current entity ID to reset tab only when switching entities
   const currentEntityIdRef = useRef(entity.id);
 
@@ -120,8 +127,17 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
       currentEntityIdRef.current = entity.id;
       setActiveTab('about');
       setEditingSection(null);
+      setEditingTypes(false);
+      setSelectedTypes(entity.types || []);
     }
   }, [entity.id]);
+
+  // Sync selectedTypes when entity.types changes (e.g., after save)
+  useEffect(() => {
+    if (!editingTypes) {
+      setSelectedTypes(entity.types || []);
+    }
+  }, [entity.types, editingTypes]);
 
   const handleUpdateSchema = async (schema: FurnisherDataSchema) => {
     try {
@@ -153,6 +169,33 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
 
   const updateFormField = (field: keyof Entity, value: string | undefined) => {
     setEditFormData(prev => ({ ...prev, [field]: value || undefined }));
+  };
+
+  // Entity type editing handlers
+  const toggleType = (type: EntityType) => {
+    setSelectedTypes(prev => {
+      if (prev.includes(type)) {
+        // Don't allow removing the last type
+        if (prev.length === 1) return prev;
+        return prev.filter(t => t !== type);
+      } else {
+        return [...prev, type];
+      }
+    });
+  };
+
+  const saveTypes = async () => {
+    try {
+      await updateEntity(entity.id, { types: selectedTypes });
+      setEditingTypes(false);
+    } catch (error) {
+      console.error('Failed to update entity types:', error);
+    }
+  };
+
+  const cancelTypeEditing = () => {
+    setEditingTypes(false);
+    setSelectedTypes(entity.types || []);
   };
 
   return (
@@ -198,20 +241,85 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
           <h2 className="text-xl font-semibold text-gray-900 truncate mb-2">
             {entity.name}
           </h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            {entity.types?.map((type) => (
-              <span
-                key={type}
-                className={`text-xs px-2 py-0.5 rounded-full ${getTypeColor(type)}`}
-              >
-                {ENTITY_TYPE_CONFIG[type]?.label}
+
+          {/* Entity Types - View Mode */}
+          {!editingTypes && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {entity.types?.map((type) => (
+                <span
+                  key={type}
+                  className={`text-xs px-2 py-0.5 rounded-full ${getTypeColor(type)}`}
+                >
+                  {ENTITY_TYPE_CONFIG[type]?.label}
+                </span>
+              ))}
+              <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-${statusConfig.color}-100 text-${statusConfig.color}-800`}>
+                <span className={`w-1.5 h-1.5 rounded-full bg-${statusConfig.color}-500`}></span>
+                {statusConfig.label}
               </span>
-            ))}
-            <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-${statusConfig.color}-100 text-${statusConfig.color}-800`}>
-              <span className={`w-1.5 h-1.5 rounded-full bg-${statusConfig.color}-500`}></span>
-              {statusConfig.label}
-            </span>
-          </div>
+              <button
+                onClick={() => setEditingTypes(true)}
+                className="text-gray-400 hover:text-blue-600 p-1 transition-colors"
+                title="Edit entity types"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Entity Types - Edit Mode */}
+          {editingTypes && (
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-gray-600">Select entity types:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={cancelTypeEditing}
+                    className="text-xs px-2 py-1 text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveTypes}
+                    className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ALL_ENTITY_TYPES.map((type) => {
+                  const isSelected = selectedTypes.includes(type);
+                  const config = ENTITY_TYPE_CONFIG[type];
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => toggleType(type)}
+                      className={`text-xs px-3 py-1.5 rounded-full border-2 transition-all ${
+                        isSelected
+                          ? `${getTypeColor(type)} border-current`
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {isSelected && (
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                        {config?.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedTypes.length === 1 && (
+                <p className="text-xs text-gray-400 mt-2">At least one type is required</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Description */}
@@ -241,11 +349,11 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Data Schema
+                Data Sources
                 <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                   activeTab === 'data-schema' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
                 }`}>
-                  {entity.dataSchema?.fields?.length || 0}
+                  {migrateDataSchema(entity.dataSchema).sources?.length || 0}
                 </span>
               </button>
             </nav>
@@ -512,9 +620,9 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
         </>
       )}
 
-      {/* Tab Content: Data Schema - Only shown for Data Furnisher entities */}
+      {/* Tab Content: Data Sources - Only shown for Data Furnisher entities */}
       {isDataFurnisher && activeTab === 'data-schema' && (
-        <FurnisherDataSchemaSection entity={entity} onUpdateSchema={handleUpdateSchema} />
+        <DataSourcesSection entity={entity} onUpdateSchema={handleUpdateSchema} />
       )}
       </div>
     </div>

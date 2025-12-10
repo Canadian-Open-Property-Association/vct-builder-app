@@ -2,6 +2,7 @@
 // Separated from catalogue.ts to focus on mapping/harmonization only
 
 import type { UserRef } from './dictionary';
+import type { DataSourceType } from './entity';
 
 // ============================================
 // FieldMapping - links a furnisher field to COPA vocab
@@ -14,8 +15,17 @@ export interface FieldMapping {
   // Source (furnisher side) - references Entity Manager
   entityId: string;                // Reference to Entity
   entityName?: string;             // Denormalized for display
-  furnisherFieldId: string;        // Reference to FurnisherField in Entity
+
+  // NEW: Data source context within the entity
+  sourceId: string;                // Reference to FurnisherDataSource
+  sourceName?: string;             // Denormalized for display
+  sourceType: DataSourceType;      // 'direct-feed' | 'credential'
+
+  furnisherFieldId: string;        // Reference to FurnisherField in the source
   furnisherFieldName?: string;     // Denormalized for display
+
+  // Full path for unique identification (e.g., "landcor.assessment-api.assessed_val")
+  fieldPath: string;               // {entityId}.{sourceId}.{fieldName}
 
   // Target (COPA vocab side) - references Data Dictionary
   vocabTypeId: string;             // Reference to VocabType
@@ -33,6 +43,22 @@ export interface FieldMapping {
   createdBy?: UserRef;
   updatedAt: string;
   updatedBy?: UserRef;
+}
+
+// Helper to generate field path
+export function generateFieldPath(entityId: string, sourceId: string, fieldName: string): string {
+  return `${entityId}.${sourceId}.${fieldName}`;
+}
+
+// Helper to parse field path
+export function parseFieldPath(fieldPath: string): { entityId: string; sourceId: string; fieldName: string } | null {
+  const parts = fieldPath.split('.');
+  if (parts.length < 3) return null;
+  return {
+    entityId: parts[0],
+    sourceId: parts[1],
+    fieldName: parts.slice(2).join('.'), // Handle field names with dots
+  };
 }
 
 // ============================================
@@ -97,6 +123,11 @@ export interface MappingWithDetails extends FieldMapping {
     id: string;
     name: string;
     logoUri?: string;
+  };
+  source?: {
+    id: string;
+    name: string;
+    type: DataSourceType;
   };
   vocabType?: {
     id: string;

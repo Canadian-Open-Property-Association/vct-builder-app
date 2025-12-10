@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import type { Entity, FurnisherField, FurnisherDataSchema } from '../../../types/entity';
+import { migrateDataSchema } from '../../../types/entity';
 import FurnisherFieldForm from './FurnisherFieldForm';
+
+// Note: This component is DEPRECATED. Use DataSourcesSection instead.
+// This component only handles legacy single-source schemas.
 
 interface FurnisherDataSchemaSectionProps {
   entity: Entity;
@@ -22,8 +26,11 @@ export default function FurnisherDataSchemaSection({ entity, onUpdateSchema }: F
   const [showFieldForm, setShowFieldForm] = useState(false);
   const [editingField, setEditingField] = useState<FurnisherField | null>(null);
 
-  const schema = entity.dataSchema || { fields: [] };
-  const fields = schema.fields || [];
+  // Use migration to handle both old and new schema formats
+  const migratedSchema = migrateDataSchema(entity.dataSchema);
+  // For backward compatibility, get fields from first source or legacy fields
+  const schema: FurnisherDataSchema = entity.dataSchema || { sources: [], fields: [] };
+  const fields = migratedSchema.sources?.[0]?.fields || schema.fields || [];
 
   const handleAddField = () => {
     setEditingField(null);
@@ -39,7 +46,14 @@ export default function FurnisherDataSchemaSection({ entity, onUpdateSchema }: F
     if (!confirm('Are you sure you want to delete this field?')) return;
 
     const updatedFields = fields.filter(f => f.id !== fieldId);
-    onUpdateSchema({ ...schema, fields: updatedFields });
+    // Update the first source's fields if using new schema, otherwise update legacy fields
+    if (migratedSchema.sources?.length > 0) {
+      const updatedSources = [...migratedSchema.sources];
+      updatedSources[0] = { ...updatedSources[0], fields: updatedFields };
+      onUpdateSchema({ ...migratedSchema, sources: updatedSources });
+    } else {
+      onUpdateSchema({ ...schema, sources: [], fields: updatedFields });
+    }
   };
 
   const handleSaveField = (field: FurnisherField) => {
@@ -53,13 +67,21 @@ export default function FurnisherDataSchemaSection({ entity, onUpdateSchema }: F
       updatedFields = [...fields, { ...field, id: `field-${Date.now()}` }];
     }
 
-    onUpdateSchema({ ...schema, fields: updatedFields });
+    // Update the first source's fields if using new schema, otherwise update legacy fields
+    if (migratedSchema.sources?.length > 0) {
+      const updatedSources = [...migratedSchema.sources];
+      updatedSources[0] = { ...updatedSources[0], fields: updatedFields };
+      onUpdateSchema({ ...migratedSchema, sources: updatedSources });
+    } else {
+      onUpdateSchema({ ...schema, sources: [], fields: updatedFields });
+    }
     setShowFieldForm(false);
     setEditingField(null);
   };
 
   const handleUpdateMetadata = (key: keyof FurnisherDataSchema, value: string) => {
-    onUpdateSchema({ ...schema, [key]: value || undefined });
+    // For legacy metadata, update on schema directly
+    onUpdateSchema({ ...schema, sources: schema.sources || [], [key]: value || undefined });
   };
 
   return (
