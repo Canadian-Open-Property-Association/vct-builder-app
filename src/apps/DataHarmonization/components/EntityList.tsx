@@ -1,5 +1,12 @@
 import { useHarmonizationStore } from '../../../store/harmonizationStore';
 
+function resolveLogoUri(logoUri: string | undefined): string | undefined {
+  if (!logoUri) return undefined;
+  if (logoUri.startsWith('http')) return logoUri;
+  if (logoUri.startsWith('/')) return logoUri;
+  return `/assets/${logoUri}`;
+}
+
 export default function EntityList() {
   const {
     selectedEntityId,
@@ -40,17 +47,23 @@ export default function EntityList() {
             <div className="flex items-center gap-3">
               {/* Logo */}
               <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
-                style={{ backgroundColor: entity.primaryColor || '#e5e7eb' }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white border border-gray-200"
               >
                 {entity.logoUri ? (
                   <img
-                    src={entity.logoUri.startsWith('http') ? entity.logoUri : `/assets/${entity.logoUri}`}
+                    src={resolveLogoUri(entity.logoUri)}
                     alt={entity.name}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain p-0.5"
+                    onError={(e) => {
+                      // Hide broken images and show fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                 ) : (
-                  <span className="text-xs font-bold text-white">
+                  <span
+                    className="text-xs font-bold"
+                    style={{ color: entity.primaryColor || '#6b7280' }}
+                  >
                     {entity.name.substring(0, 2).toUpperCase()}
                   </span>
                 )}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { FurnisherField } from '../../../types/entity';
 
 interface FurnisherFieldFormProps {
@@ -77,11 +78,19 @@ export default function FurnisherFieldForm({ field, onSave, onClose }: Furnisher
     });
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+  const modalContent = (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
           <h3 className="text-lg font-semibold text-gray-900">
             {field ? 'Edit Field' : 'Add Field'}
           </h3>
@@ -222,7 +231,7 @@ export default function FurnisherFieldForm({ field, onSave, onClose }: Furnisher
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
           <button
             type="button"
             onClick={onClose}
@@ -231,6 +240,7 @@ export default function FurnisherFieldForm({ field, onSave, onClose }: Furnisher
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
           >
@@ -240,4 +250,6 @@ export default function FurnisherFieldForm({ field, onSave, onClose }: Furnisher
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
