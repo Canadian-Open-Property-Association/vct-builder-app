@@ -10,6 +10,32 @@ export interface UserRef {
   name?: string;
 }
 
+// ============================================
+// Furnisher Data Schema Types
+// For data-furnisher entities to define their field structure
+// ============================================
+
+export interface FurnisherField {
+  id: string;
+  name: string;                    // Field name from furnisher (e.g., "assessed_val")
+  displayName?: string;            // Human readable (e.g., "Assessed Value")
+  description?: string;
+  dataType?: 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'array' | 'object';
+  sampleValue?: string;
+  apiPath?: string;                // JSON path in API response (e.g., "data.property.value")
+  required?: boolean;
+  notes?: string;
+}
+
+export interface FurnisherDataSchema {
+  fields: FurnisherField[];
+  apiDocumentationUrl?: string;    // Link to their API docs
+  apiEndpoint?: string;            // Base endpoint URL
+  updateFrequency?: 'realtime' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
+  lastUpdated?: string;
+  notes?: string;
+}
+
 export interface Entity {
   id: string;                    // Unique identifier (slug format: copa-entity-name)
   name: string;                  // Display name
@@ -31,6 +57,7 @@ export interface Entity {
 
   // Data Furnisher specific (only relevant if types includes 'data-furnisher')
   regionsCovered?: string[];     // Regions/provinces this entity covers
+  dataSchema?: FurnisherDataSchema;  // Field definitions for this furnisher's data
 
   // Metadata
   status: EntityStatus;

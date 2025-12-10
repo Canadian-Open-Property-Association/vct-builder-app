@@ -92,6 +92,24 @@ export const DEFAULT_STANDARD_CLAIMS: StandardClaimsConfig = {
   status: { enabled: false, required: false },
 };
 
+// ============================================
+// Evidence Requirements - for declaring data provenance
+// ============================================
+
+export interface EvidenceRequirement {
+  id: string;
+  claimPath?: string;              // Which claim (or group if not specified, applies to all)
+  furnisherCategory: string;       // e.g., "property-valuation", "identity-verification"
+  authorizedEntities: string[];    // Entity IDs that can provide this evidence
+  required: boolean;               // Must have evidence vs optional
+  description?: string;            // Human-readable description of this evidence requirement
+}
+
+export interface EvidenceConfig {
+  defaultCategory?: string;        // Group-level default furnisher category
+  requirements: EvidenceRequirement[];  // Per-claim or global evidence requirements
+}
+
 // Schema metadata
 export interface SchemaMetadata {
   schemaId: string;              // $id URL
@@ -122,6 +140,9 @@ export interface SchemaMetadata {
   contextUrl?: string;           // Base URL for @context references
   contextVersion?: number;       // @version (default 1.1)
   protected?: boolean;           // @protected flag
+
+  // Evidence configuration (data provenance requirements)
+  evidence?: EvidenceConfig;
 }
 
 // Standard VC properties (auto-included in every schema)

@@ -100,8 +100,10 @@ export default function SchemaJsonPreview() {
           setParseError('Invalid JSON-LD: missing @context');
           return;
         }
-        // TODO: Implement full JSON-LD context import when ready
-        // For now, JSON-LD editing is display-only with syntax highlighting
+        // Only update if JSON actually changed
+        if (localJson !== storeJsonString) {
+          importSchema(localJson);
+        }
         setParseError(null);
       } else {
         // JSON Schema validation - must have required structure
@@ -258,14 +260,9 @@ export default function SchemaJsonPreview() {
       </div>
 
       {/* Edit hint at bottom */}
-      {!isFocused && !isJsonLdMode && (
+      {!isFocused && (
         <div className="px-3 py-1.5 bg-gray-800 border-t border-gray-700 text-gray-500 text-xs text-center">
           Click to edit JSON directly
-        </div>
-      )}
-      {!isFocused && isJsonLdMode && (
-        <div className="px-3 py-1.5 bg-gray-800 border-t border-gray-700 text-gray-500 text-xs text-center">
-          JSON-LD editing coming soon - use form controls to modify
         </div>
       )}
     </div>
