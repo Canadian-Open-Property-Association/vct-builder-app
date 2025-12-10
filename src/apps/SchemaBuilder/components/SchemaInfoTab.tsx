@@ -19,7 +19,6 @@ import IssuerSelector from './IssuerSelector';
 import StandardClaimsPanel from './StandardClaimsPanel';
 import GovernanceDocsList from './GovernanceDocsList';
 import VocabularyManager from './VocabularyManager';
-import OcaSelector from './OcaSelector';
 
 // Predefined categories aligned with Data Catalogue
 const SCHEMA_CATEGORIES = [
@@ -215,9 +214,8 @@ export default function SchemaInfoTab() {
       {/* Mode-specific sections */}
       {isJsonLdMode ? (
         <>
-          {/* JSON-LD Mode: Vocabulary Manager + OCA Selector */}
+          {/* JSON-LD Mode: Vocabulary Manager */}
           <VocabularyManager />
-          <OcaSelector />
         </>
       ) : (
         <>

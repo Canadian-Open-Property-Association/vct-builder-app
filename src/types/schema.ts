@@ -122,7 +122,6 @@ export interface SchemaMetadata {
   contextUrl?: string;           // Base URL for @context references
   contextVersion?: number;       // @version (default 1.1)
   protected?: boolean;           // @protected flag
-  ocaUrl?: string;               // OCA/VCT branding URL (included in JSON-LD output)
 }
 
 // Standard VC properties (auto-included in every schema)
@@ -298,7 +297,6 @@ export const createDefaultMetadata = (): SchemaMetadata => ({
   contextUrl: undefined,
   contextVersion: 1.1,
   protected: true,
-  ocaUrl: undefined,
 });
 
 // Create default empty property
@@ -739,11 +737,6 @@ export const toJsonLdContext = (
     '@version': metadata.contextVersion || 1.1,
     '@protected': metadata.protected ?? true,
   };
-
-  // Add OCA/VCT reference if provided
-  if (metadata.ocaUrl) {
-    contextContent['oca'] = metadata.ocaUrl;
-  }
 
   // Add vocabulary references
   contextContent['vocab'] = vocabUrl;

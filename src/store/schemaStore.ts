@@ -525,7 +525,6 @@ export const useSchemaStore = create<SchemaStore>()(
             contextUrl: undefined,
             contextVersion: 1.1,
             protected: true,
-            ocaUrl: undefined,
           };
 
           // Parse credentialSubject properties

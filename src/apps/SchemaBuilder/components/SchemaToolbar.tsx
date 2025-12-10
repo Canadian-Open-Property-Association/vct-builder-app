@@ -50,11 +50,6 @@ export default function SchemaToolbar() {
     }
   };
 
-  const handleSaveAs = () => {
-    setSaveName(currentProjectName);
-    setShowSaveModal(true);
-  };
-
   const handleConfirmSave = async () => {
     if (saveName.trim()) {
       await saveSchema(saveName.trim());
@@ -103,14 +98,6 @@ export default function SchemaToolbar() {
           Save
         </button>
 
-        {/* Save As */}
-        <button
-          onClick={handleSaveAs}
-          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-        >
-          Save As...
-        </button>
-
         {/* Load */}
         <button
           onClick={() => setShowLoadModal(true)}
@@ -121,6 +108,18 @@ export default function SchemaToolbar() {
           </svg>
           Open
         </button>
+
+        {/* Format Badge */}
+        <div className="w-px h-6 bg-gray-300 mx-2" />
+        <span
+          className={`px-3 py-1 text-xs font-medium rounded-full ${
+            isJsonLdMode
+              ? 'bg-purple-100 text-purple-700 border border-purple-200'
+              : 'bg-green-100 text-green-700 border border-green-200'
+          }`}
+        >
+          {isJsonLdMode ? 'JSON-LD Context' : 'SD-JWT Schema'}
+        </span>
 
         {/* Save to Repo - only for authenticated users */}
         {isAuthenticated && (
