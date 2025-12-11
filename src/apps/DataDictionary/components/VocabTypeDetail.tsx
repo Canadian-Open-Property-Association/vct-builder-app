@@ -5,6 +5,16 @@ import PropertyForm from './PropertyForm';
 import JsonPreviewModal from './JsonPreviewModal';
 import MovePropertiesModal from './MovePropertiesModal';
 
+// Domain colors for badges
+const DOMAIN_COLORS: Record<string, string> = {
+  property: '#10B981',
+  financial: '#3B82F6',
+  identity: '#8B5CF6',
+  employment: '#F59E0B',
+  other: '#6B7280',
+  untagged: '#9CA3AF',
+};
+
 interface VocabTypeDetailProps {
   onEdit: () => void;
 }
@@ -36,7 +46,7 @@ const VALUE_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function VocabTypeDetail({ onEdit }: VocabTypeDetailProps) {
-  const { selectedVocabType, deleteProperty } = useDictionaryStore();
+  const { selectedVocabType, deleteProperty, domains } = useDictionaryStore();
   const [showPropertyForm, setShowPropertyForm] = useState(false);
   const [editingProperty, setEditingProperty] = useState<VocabProperty | null>(null);
   const [previewProperty, setPreviewProperty] = useState<VocabProperty | null>(null);
@@ -44,6 +54,23 @@ export default function VocabTypeDetail({ onEdit }: VocabTypeDetailProps) {
   const [showMoveModal, setShowMoveModal] = useState(false);
 
   if (!selectedVocabType) return null;
+
+  // Get domain color
+  const getDomainColor = (domainId: string) => {
+    const domain = domains.find(d => d.id === domainId);
+    return domain?.color || DOMAIN_COLORS[domainId] || '#6B7280';
+  };
+
+  // Get domain label
+  const getDomainLabel = (domainId: string) => {
+    const domain = domains.find(d => d.id === domainId);
+    return domain?.name || domainId.charAt(0).toUpperCase() + domainId.slice(1);
+  };
+
+  // Get domains for the selected vocab type (supporting both new and legacy format)
+  const vocabTypeDomains = selectedVocabType.domains && selectedVocabType.domains.length > 0
+    ? selectedVocabType.domains
+    : (selectedVocabType.category ? [selectedVocabType.category] : []);
 
   const handleDeleteProperty = async (propertyId: string) => {
     if (confirm('Are you sure you want to delete this property?')) {
@@ -88,7 +115,22 @@ export default function VocabTypeDetail({ onEdit }: VocabTypeDetailProps) {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">{selectedVocabType.name}</h2>
-          <div className="flex items-center gap-1 mt-1">
+          {/* Domain badges */}
+          <div className="flex items-center gap-2 mt-2">
+            {vocabTypeDomains.map(domainId => (
+              <span
+                key={domainId}
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+                style={{ backgroundColor: getDomainColor(domainId) }}
+              >
+                {getDomainLabel(domainId)}
+              </span>
+            ))}
+            {vocabTypeDomains.length === 0 && (
+              <span className="text-xs text-gray-400 italic">No domain assigned</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 mt-2">
             <span className="text-xs text-gray-500 font-mono">
               governance/credentials/vocab/{selectedVocabType.id}.json
             </span>

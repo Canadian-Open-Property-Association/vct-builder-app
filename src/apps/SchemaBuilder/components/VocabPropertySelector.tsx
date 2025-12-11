@@ -1,13 +1,23 @@
 /**
  * VocabPropertySelector Component
  *
- * Allows users to browse and select properties from the Data Catalogue vocabulary.
- * Properties are organized by DataType (vocabulary domain).
+ * Allows users to browse and select properties from the Data Dictionary vocabulary.
+ * Properties are organized by VocabType (vocabulary terms) with domain filtering.
  */
 
 import { useState, useEffect } from 'react';
-import { fetchDataTypes, fetchCategories, cataloguePropertyToSchemaProperty, DataType, DataTypeCategory } from '../../../services/catalogueApi';
+import { fetchDataTypes, fetchDomains, cataloguePropertyToSchemaProperty, DataType, DataTypeDomain } from '../../../services/catalogueApi';
 import { useSchemaStore } from '../../../store/schemaStore';
+
+// Domain colors for badges
+const DOMAIN_COLORS: Record<string, string> = {
+  property: '#10B981',
+  financial: '#3B82F6',
+  identity: '#8B5CF6',
+  employment: '#F59E0B',
+  other: '#6B7280',
+  untagged: '#9CA3AF',
+};
 
 interface VocabPropertySelectorProps {
   isOpen: boolean;
@@ -15,9 +25,9 @@ interface VocabPropertySelectorProps {
 }
 
 export default function VocabPropertySelector({ isOpen, onClose }: VocabPropertySelectorProps) {
-  const [categories, setCategories] = useState<DataTypeCategory[]>([]);
+  const [domains, setDomains] = useState<DataTypeDomain[]>([]);
   const [dataTypes, setDataTypes] = useState<DataType[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [selectedDataType, setSelectedDataType] = useState<DataType | null>(null);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -25,7 +35,30 @@ export default function VocabPropertySelector({ isOpen, onClose }: VocabProperty
 
   const addPropertyWithData = useSchemaStore((state) => state.addPropertyWithData);
 
-  // Load categories and data types on mount
+  // Get domain color
+  const getDomainColor = (domainId: string) => {
+    const domain = domains.find(d => d.id === domainId);
+    return domain?.color || DOMAIN_COLORS[domainId] || '#6B7280';
+  };
+
+  // Get domain label
+  const getDomainLabel = (domainId: string) => {
+    const domain = domains.find(d => d.id === domainId);
+    return domain?.name || domainId.charAt(0).toUpperCase() + domainId.slice(1);
+  };
+
+  // Get domains for a vocab type (supporting both new and legacy format)
+  const getVocabTypeDomains = (vt: DataType): string[] => {
+    if (vt.domains && vt.domains.length > 0) {
+      return vt.domains;
+    }
+    if (vt.category) {
+      return [vt.category];
+    }
+    return [];
+  };
+
+  // Load domains and data types on mount
   useEffect(() => {
     if (!isOpen) return;
 
@@ -33,11 +66,11 @@ export default function VocabPropertySelector({ isOpen, onClose }: VocabProperty
       setLoading(true);
       setError(null);
       try {
-        const [cats, types] = await Promise.all([
-          fetchCategories(),
+        const [doms, types] = await Promise.all([
+          fetchDomains(),
           fetchDataTypes(),
         ]);
-        setCategories(cats);
+        setDomains(doms);
         setDataTypes(types);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load vocabulary');
@@ -49,9 +82,12 @@ export default function VocabPropertySelector({ isOpen, onClose }: VocabProperty
     loadData();
   }, [isOpen]);
 
-  // Filter data types by selected category
-  const filteredDataTypes = selectedCategory
-    ? dataTypes.filter(dt => dt.category === selectedCategory)
+  // Filter data types by selected domain
+  const filteredDataTypes = selectedDomain
+    ? dataTypes.filter(dt => {
+        const vtDomains = getVocabTypeDomains(dt);
+        return vtDomains.includes(selectedDomain);
+      })
     : dataTypes;
 
   // Handle property selection toggle
@@ -131,29 +167,50 @@ export default function VocabPropertySelector({ isOpen, onClose }: VocabProperty
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Left sidebar - Categories and DataTypes */}
+          {/* Left sidebar - Domains and DataTypes */}
           <div className="w-1/3 border-r border-gray-200 flex flex-col overflow-hidden">
-            {/* Category Filter */}
+            {/* Domain Filter Chips */}
             <div className="p-3 border-b border-gray-200">
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Filter by Category
+              <label className="block text-xs font-medium text-gray-600 mb-2">
+                Filter by Domain
               </label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  setSelectedDataType(null);
-                  setSelectedProperties(new Set());
-                }}
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500"
-              >
-                <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => {
+                    setSelectedDomain(null);
+                    setSelectedDataType(null);
+                    setSelectedProperties(new Set());
+                  }}
+                  className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                    selectedDomain === null
+                      ? 'bg-gray-700 text-white'
+                      : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  All
+                </button>
+                {domains.sort((a, b) => a.order - b.order).map(domain => {
+                  const isActive = selectedDomain === domain.id;
+                  return (
+                    <button
+                      key={domain.id}
+                      onClick={() => {
+                        setSelectedDomain(isActive ? null : domain.id);
+                        setSelectedDataType(null);
+                        setSelectedProperties(new Set());
+                      }}
+                      className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                        isActive
+                          ? 'text-white'
+                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                      }`}
+                      style={isActive ? { backgroundColor: getDomainColor(domain.id) } : {}}
+                    >
+                      {domain.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* DataTypes List */}
@@ -173,23 +230,37 @@ export default function VocabPropertySelector({ isOpen, onClose }: VocabProperty
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100">
-                  {filteredDataTypes.map((dt) => (
-                    <li
-                      key={dt.id}
-                      onClick={() => {
-                        setSelectedDataType(dt);
-                        setSelectedProperties(new Set());
-                      }}
-                      className={`p-3 cursor-pointer hover:bg-gray-50 ${
-                        selectedDataType?.id === dt.id ? 'bg-purple-50 border-l-2 border-purple-500' : ''
-                      }`}
-                    >
-                      <div className="font-medium text-sm">{dt.name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {dt.properties.length} properties
-                      </div>
-                    </li>
-                  ))}
+                  {filteredDataTypes.map((dt) => {
+                    const vtDomains = getVocabTypeDomains(dt);
+                    return (
+                      <li
+                        key={dt.id}
+                        onClick={() => {
+                          setSelectedDataType(dt);
+                          setSelectedProperties(new Set());
+                        }}
+                        className={`p-3 cursor-pointer hover:bg-gray-50 ${
+                          selectedDataType?.id === dt.id ? 'bg-purple-50 border-l-2 border-purple-500' : ''
+                        }`}
+                      >
+                        <div className="font-medium text-sm">{dt.name}</div>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="text-xs text-gray-500">
+                            {dt.properties.length} properties
+                          </span>
+                          {vtDomains.map(domainId => (
+                            <span
+                              key={domainId}
+                              className="text-xs px-1 py-0.5 rounded text-white"
+                              style={{ backgroundColor: getDomainColor(domainId) }}
+                            >
+                              {getDomainLabel(domainId)}
+                            </span>
+                          ))}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -201,7 +272,18 @@ export default function VocabPropertySelector({ isOpen, onClose }: VocabProperty
               <>
                 {/* DataType header */}
                 <div className="p-3 border-b border-gray-200 bg-gray-50">
-                  <h4 className="font-medium">{selectedDataType.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium">{selectedDataType.name}</h4>
+                    {getVocabTypeDomains(selectedDataType).map(domainId => (
+                      <span
+                        key={domainId}
+                        className="text-xs px-1.5 py-0.5 rounded text-white"
+                        style={{ backgroundColor: getDomainColor(domainId) }}
+                      >
+                        {getDomainLabel(domainId)}
+                      </span>
+                    ))}
+                  </div>
                   {selectedDataType.description && (
                     <p className="text-xs text-gray-500 mt-1">{selectedDataType.description}</p>
                   )}

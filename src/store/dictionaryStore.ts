@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import type {
   VocabType,
   VocabCategory,
+  VocabDomain,
   VocabProperty,
   CategoryWithTypes,
+  DomainWithTypes,
   DictionaryStats,
   DictionaryExport,
 } from '../types/dictionary';
@@ -164,6 +166,8 @@ const dictionaryApi = {
 interface DictionaryState {
   // Data
   vocabTypes: VocabType[];
+  domains: VocabDomain[];
+  /** @deprecated Use domains */
   categories: VocabCategory[];
   selectedVocabType: VocabType | null;
 
@@ -176,8 +180,13 @@ interface DictionaryState {
   searchQuery: string;
   searchResults: VocabType[] | null;
 
+  // Domain filter for flat list view
+  selectedDomainFilter: string | null;  // null = show all
+
   // Actions
   fetchVocabTypes: () => Promise<void>;
+  fetchDomains: () => Promise<void>;
+  /** @deprecated Use fetchDomains */
   fetchCategories: () => Promise<void>;
   selectVocabType: (id: string) => Promise<void>;
   clearSelection: () => void;
@@ -193,7 +202,9 @@ interface DictionaryState {
   deleteProperty: (vocabTypeId: string, propertyId: string) => Promise<void>;
   moveProperties: (sourceVocabTypeId: string, propertyIds: string[], targetVocabTypeId: string) => Promise<void>;
 
-  // Category CRUD
+  // Domain CRUD
+  createDomain: (domain: Partial<VocabDomain>) => Promise<VocabDomain>;
+  /** @deprecated Use createDomain */
   createCategory: (category: Partial<VocabCategory>) => Promise<VocabCategory>;
 
   // Search & Export
@@ -202,8 +213,16 @@ interface DictionaryState {
   clearSearch: () => void;
   exportAll: () => Promise<DictionaryExport>;
 
-  // Helper: Get vocab types grouped by category
+  // Domain filter actions
+  setDomainFilter: (domainId: string | null) => void;
+
+  // Helper: Get vocab types grouped by domain (flat list with filter)
+  getVocabTypesByDomain: () => DomainWithTypes[];
+  /** @deprecated Use getVocabTypesByDomain */
   getVocabTypesByCategory: () => CategoryWithTypes[];
+
+  // Helper: Get filtered vocab types based on selected domain
+  getFilteredVocabTypes: () => VocabType[];
 }
 
 // ============================================
@@ -213,13 +232,15 @@ interface DictionaryState {
 export const useDictionaryStore = create<DictionaryState>((set, get) => ({
   // Initial state
   vocabTypes: [],
-  categories: [],
+  domains: [],
+  categories: [],  // Deprecated alias for domains
   selectedVocabType: null,
   isLoading: false,
   isVocabTypeLoading: false,
   error: null,
   searchQuery: '',
   searchResults: null,
+  selectedDomainFilter: null,
 
   // Fetch all vocab types
   fetchVocabTypes: async () => {
@@ -235,14 +256,19 @@ export const useDictionaryStore = create<DictionaryState>((set, get) => ({
     }
   },
 
-  // Fetch categories
-  fetchCategories: async () => {
+  // Fetch domains (new name for categories)
+  fetchDomains: async () => {
     try {
-      const categories = await dictionaryApi.listCategories();
-      set({ categories });
+      const domains = await dictionaryApi.listCategories();
+      set({ domains, categories: domains });  // Keep categories in sync for backwards compat
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Error fetching domains:', error);
     }
+  },
+
+  // Deprecated: Fetch categories (alias for fetchDomains)
+  fetchCategories: async () => {
+    return get().fetchDomains();
   },
 
   // Select a vocab type
@@ -342,11 +368,21 @@ export const useDictionaryStore = create<DictionaryState>((set, get) => ({
     }
   },
 
-  // Create category
-  createCategory: async (category) => {
-    const result = await dictionaryApi.createCategory(category);
-    await get().fetchCategories();
+  // Create domain
+  createDomain: async (domain) => {
+    const result = await dictionaryApi.createCategory(domain);
+    await get().fetchDomains();
     return result;
+  },
+
+  // Deprecated: Create category (alias for createDomain)
+  createCategory: async (category) => {
+    return get().createDomain(category);
+  },
+
+  // Set domain filter for flat list view
+  setDomainFilter: (domainId: string | null) => {
+    set({ selectedDomainFilter: domainId });
   },
 
   // Search
@@ -376,45 +412,82 @@ export const useDictionaryStore = create<DictionaryState>((set, get) => ({
     return dictionaryApi.exportAll();
   },
 
-  // Helper: Get vocab types grouped by category
-  getVocabTypesByCategory: () => {
-    const { vocabTypes, categories } = get();
-    const result: CategoryWithTypes[] = [];
+  // Helper: Get vocab types grouped by domain
+  getVocabTypesByDomain: () => {
+    const { vocabTypes, domains } = get();
+    const result: DomainWithTypes[] = [];
 
     if (!Array.isArray(vocabTypes)) {
       return result;
     }
 
-    // Group vocab types by category
-    const grouped = new Map<string, VocabType[]>();
-    for (const vt of vocabTypes) {
-      const catId = vt.category || 'other';
-      if (!grouped.has(catId)) {
-        grouped.set(catId, []);
-      }
-      grouped.get(catId)!.push(vt);
-    }
-
-    // Sort categories and create result
-    const sortedCategories = Array.isArray(categories)
-      ? [...categories].sort((a, b) => a.order - b.order)
+    // Sort domains by order
+    const sortedDomains = Array.isArray(domains)
+      ? [...domains].sort((a, b) => a.order - b.order)
       : [];
-    for (const cat of sortedCategories) {
-      const types = grouped.get(cat.id) || [];
-      if (types.length > 0) {
-        result.push({ category: cat, vocabTypes: types });
+
+    // For each domain, find all vocab types that have that domain
+    for (const domain of sortedDomains) {
+      const typesInDomain = vocabTypes.filter(vt => {
+        // Support both new domains array and legacy category field
+        if (vt.domains && vt.domains.length > 0) {
+          return vt.domains.includes(domain.id);
+        }
+        // Legacy: fall back to category field
+        return vt.category === domain.id;
+      });
+      if (typesInDomain.length > 0) {
+        result.push({ domain, vocabTypes: typesInDomain });
       }
     }
 
-    // Add "Other" category for uncategorized types
-    const otherTypes = grouped.get('other') || [];
-    if (otherTypes.length > 0) {
+    // Add "Untagged" for vocab types with no domains
+    const untaggedTypes = vocabTypes.filter(vt => {
+      const hasDomains = vt.domains && vt.domains.length > 0;
+      const hasCategory = vt.category && vt.category !== 'other';
+      return !hasDomains && !hasCategory;
+    });
+    if (untaggedTypes.length > 0) {
       result.push({
-        category: { id: 'other', name: 'Other', order: 999 },
-        vocabTypes: otherTypes,
+        domain: { id: 'untagged', name: 'Untagged', order: 999 },
+        vocabTypes: untaggedTypes,
       });
     }
 
     return result;
+  },
+
+  // Deprecated: Get vocab types grouped by category (alias for getVocabTypesByDomain)
+  getVocabTypesByCategory: () => {
+    return get().getVocabTypesByDomain();
+  },
+
+  // Helper: Get filtered vocab types based on selected domain
+  getFilteredVocabTypes: () => {
+    const { vocabTypes, selectedDomainFilter, searchQuery, searchResults } = get();
+
+    // If search is active, use search results
+    if (searchQuery && searchResults) {
+      return searchResults;
+    }
+
+    if (!Array.isArray(vocabTypes)) {
+      return [];
+    }
+
+    // If no filter, return all
+    if (!selectedDomainFilter) {
+      return vocabTypes;
+    }
+
+    // Filter by domain
+    return vocabTypes.filter(vt => {
+      // Support both new domains array and legacy category field
+      if (vt.domains && vt.domains.length > 0) {
+        return vt.domains.includes(selectedDomainFilter);
+      }
+      // Legacy: fall back to category field
+      return vt.category === selectedDomainFilter;
+    });
   },
 }));

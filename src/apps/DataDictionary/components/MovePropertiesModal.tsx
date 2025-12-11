@@ -9,6 +9,15 @@ interface MovePropertiesModalProps {
   onComplete: () => void;
 }
 
+// Domain options for multi-select
+const DOMAIN_OPTIONS = [
+  { value: 'property', label: 'Property', color: '#10B981' },
+  { value: 'financial', label: 'Financial', color: '#3B82F6' },
+  { value: 'identity', label: 'Identity', color: '#8B5CF6' },
+  { value: 'employment', label: 'Employment', color: '#F59E0B' },
+  { value: 'other', label: 'Other', color: '#6B7280' },
+];
+
 export default function MovePropertiesModal({
   sourceVocabTypeId,
   sourceVocabTypeName,
@@ -16,7 +25,7 @@ export default function MovePropertiesModal({
   onClose,
   onComplete,
 }: MovePropertiesModalProps) {
-  const { vocabTypes, categories, moveProperties, createVocabType, createCategory } = useDictionaryStore();
+  const { vocabTypes, domains, moveProperties, createVocabType, createDomain } = useDictionaryStore();
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [selectedVocabTypeId, setSelectedVocabTypeId] = useState<string>('');
   const [isMoving, setIsMoving] = useState(false);
@@ -25,12 +34,49 @@ export default function MovePropertiesModal({
   // New vocab type form
   const [newVocabTypeName, setNewVocabTypeName] = useState('');
   const [newVocabTypeId, setNewVocabTypeId] = useState('');
-  const [newVocabTypeCategory, setNewVocabTypeCategory] = useState('');
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newVocabTypeDomains, setNewVocabTypeDomains] = useState<string[]>([]);
+  const [showNewDomainInput, setShowNewDomainInput] = useState(false);
+  const [newDomainName, setNewDomainName] = useState('');
 
   // Filter out the source vocab type from the list
   const availableVocabTypes = vocabTypes.filter(vt => vt.id !== sourceVocabTypeId);
+
+  // Use domains from store if available, otherwise fall back to defaults
+  const availableDomains = domains.length > 0
+    ? domains.map(d => ({ value: d.id, label: d.name, color: d.color || '#6B7280' }))
+    : DOMAIN_OPTIONS;
+
+  // Toggle domain selection
+  const toggleDomain = (domainId: string) => {
+    setNewVocabTypeDomains(prev =>
+      prev.includes(domainId)
+        ? prev.filter(d => d !== domainId)
+        : [...prev, domainId]
+    );
+  };
+
+  // Get domain color
+  const getDomainColor = (domainId: string) => {
+    const domain = availableDomains.find(d => d.value === domainId);
+    return domain?.color || '#6B7280';
+  };
+
+  // Get domain label
+  const getDomainLabel = (domainId: string) => {
+    const domain = availableDomains.find(d => d.value === domainId);
+    return domain?.label || domainId;
+  };
+
+  // Get domains display for a vocab type
+  const getVocabTypeDomains = (vt: typeof vocabTypes[0]): string[] => {
+    if (vt.domains && vt.domains.length > 0) {
+      return vt.domains;
+    }
+    if (vt.category) {
+      return [vt.category];
+    }
+    return [];
+  };
 
   const handleMove = async () => {
     setError(null);
@@ -46,23 +92,23 @@ export default function MovePropertiesModal({
           return;
         }
 
-        let categoryId = newVocabTypeCategory;
+        let domainsToUse = [...newVocabTypeDomains];
 
-        // Create new category if needed
-        if (showNewCategoryInput && newCategoryName.trim()) {
-          const newCategory = await createCategory({
-            name: newCategoryName.trim(),
-            id: newCategoryName.trim().toLowerCase().replace(/\s+/g, '-'),
-            order: categories.length,
+        // Create new domain if needed
+        if (showNewDomainInput && newDomainName.trim()) {
+          const newDomain = await createDomain({
+            name: newDomainName.trim(),
+            id: newDomainName.trim().toLowerCase().replace(/\s+/g, '-'),
+            order: domains.length,
           });
-          categoryId = newCategory.id;
+          domainsToUse.push(newDomain.id);
         }
 
         // Create new vocab type
         const newVocabType = await createVocabType({
           name: newVocabTypeName.trim(),
           id: newVocabTypeId.trim() || newVocabTypeName.trim().toLowerCase().replace(/\s+/g, '-'),
-          category: categoryId || 'other',
+          domains: domainsToUse.length > 0 ? domainsToUse : ['other'],
           properties: [],
         });
         targetVocabTypeId = newVocabType.id;
@@ -136,11 +182,14 @@ export default function MovePropertiesModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select a vocab type...</option>
-                {availableVocabTypes.map((vt) => (
-                  <option key={vt.id} value={vt.id}>
-                    {vt.name} ({vt.category || 'Uncategorized'})
-                  </option>
-                ))}
+                {availableVocabTypes.map((vt) => {
+                  const vtDomains = getVocabTypeDomains(vt);
+                  return (
+                    <option key={vt.id} value={vt.id}>
+                      {vt.name} ({vtDomains.length > 0 ? vtDomains.join(', ') : 'No domain'})
+                    </option>
+                  );
+                })}
               </select>
             </div>
           ) : (
@@ -178,46 +227,86 @@ export default function MovePropertiesModal({
                 <p className="text-xs text-gray-500 mt-1">Unique identifier (auto-generated from name)</p>
               </div>
 
+              {/* Domains (multi-select) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Domains
                 </label>
-                {!showNewCategoryInput ? (
-                  <div className="flex gap-2">
-                    <select
-                      value={newVocabTypeCategory}
-                      onChange={(e) => setNewVocabTypeCategory(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select a category...</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
+
+                {/* Selected domains as chips */}
+                {newVocabTypeDomains.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {newVocabTypeDomains.map(domainId => (
+                      <span
+                        key={domainId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: getDomainColor(domainId) }}
+                      >
+                        {getDomainLabel(domainId)}
+                        <button
+                          type="button"
+                          onClick={() => toggleDomain(domainId)}
+                          className="ml-0.5 hover:bg-white/20 rounded-full p-0.5"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {!showNewDomainInput ? (
+                  <div className="space-y-2">
+                    {/* Domain selector buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {availableDomains.map(domain => {
+                        const isSelected = newVocabTypeDomains.includes(domain.value);
+                        return (
+                          <button
+                            key={domain.value}
+                            type="button"
+                            onClick={() => toggleDomain(domain.value)}
+                            className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                              isSelected
+                                ? 'border-transparent text-white'
+                                : 'border-gray-300 text-gray-600 hover:border-gray-400 bg-white'
+                            }`}
+                            style={isSelected ? { backgroundColor: domain.color } : {}}
+                          >
+                            {isSelected && (
+                              <svg className="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                            {domain.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setShowNewCategoryInput(true)}
-                      className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
+                      onClick={() => setShowNewDomainInput(true)}
+                      className="text-xs text-blue-600 hover:underline"
                     >
-                      + New
+                      + Add new domain
                     </button>
                   </div>
                 ) : (
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="New category name"
+                      value={newDomainName}
+                      onChange={(e) => setNewDomainName(e.target.value)}
+                      placeholder="New domain name"
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
                       type="button"
                       onClick={() => {
-                        setShowNewCategoryInput(false);
-                        setNewCategoryName('');
+                        setShowNewDomainInput(false);
+                        setNewDomainName('');
                       }}
                       className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
                     >
@@ -225,6 +314,9 @@ export default function MovePropertiesModal({
                     </button>
                   </div>
                 )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Select one or more domains for this vocabulary type
+                </p>
               </div>
             </div>
           )}

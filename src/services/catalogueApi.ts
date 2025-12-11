@@ -8,25 +8,26 @@
  * and DevTools components that depend on this API.
  */
 
-import type { VocabType, VocabCategory, VocabProperty } from '../types/dictionary';
+import type { VocabType, VocabCategory, VocabDomain, VocabProperty } from '../types/dictionary';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
 // Re-export types with old names for backwards compatibility
 export type DataType = VocabType;
 export type DataTypeCategory = VocabCategory;
+export type DataTypeDomain = VocabDomain;
 export type Property = VocabProperty;
 
 /**
- * Fetch all categories from the dictionary
+ * Fetch all domains from the dictionary
  */
-export async function fetchCategories(): Promise<VocabCategory[]> {
+export async function fetchDomains(): Promise<VocabDomain[]> {
   const response = await fetch(`${API_BASE}/api/dictionary/categories`, {
     credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch categories: ${response.statusText}`);
+    throw new Error(`Failed to fetch domains: ${response.statusText}`);
   }
 
   const data = await response.json();
@@ -34,13 +35,21 @@ export async function fetchCategories(): Promise<VocabCategory[]> {
 }
 
 /**
- * Fetch all VocabTypes (vocabulary terms)
- * Optionally filter by category
+ * Fetch all categories from the dictionary
+ * @deprecated Use fetchDomains() instead
  */
-export async function fetchDataTypes(category?: string): Promise<VocabType[]> {
+export async function fetchCategories(): Promise<VocabCategory[]> {
+  return fetchDomains();
+}
+
+/**
+ * Fetch all VocabTypes (vocabulary terms)
+ * Optionally filter by domain (or legacy category)
+ */
+export async function fetchDataTypes(domainOrCategory?: string): Promise<VocabType[]> {
   const url = new URL(`${API_BASE}/api/dictionary/vocab-types`, window.location.origin);
-  if (category) {
-    url.searchParams.set('category', category);
+  if (domainOrCategory) {
+    url.searchParams.set('domain', domainOrCategory);
   }
 
   const response = await fetch(url.toString(), {
@@ -102,7 +111,9 @@ export async function fetchCatalogueStats(): Promise<{
   totalProperties: number;
   totalSources: number;
   totalCategories: number;
+  totalDomains: number;
   categoryCounts: Record<string, number>;
+  domainCounts: Record<string, number>;
 }> {
   const response = await fetch(`${API_BASE}/api/dictionary/stats`, {
     credentials: 'include',
@@ -114,12 +125,15 @@ export async function fetchCatalogueStats(): Promise<{
 
   const data = await response.json();
   // Map new field names to old for backwards compatibility
+  const domainCounts = data.domainCounts || data.categoryCounts || {};
   return {
     totalDataTypes: data.totalVocabTypes || 0,
     totalProperties: data.totalProperties || 0,
     totalSources: 0, // No longer tracked in dictionary
-    totalCategories: Object.keys(data.categoryCounts || {}).length,
-    categoryCounts: data.categoryCounts || {},
+    totalCategories: Object.keys(domainCounts).length,
+    totalDomains: Object.keys(domainCounts).length,
+    categoryCounts: domainCounts, // Legacy alias
+    domainCounts: domainCounts,
   };
 }
 

@@ -883,24 +883,33 @@ router.get('/export', (req, res) => {
 router.get('/stats', (req, res) => {
   try {
     const dataTypes = loadDataTypes();
-    const categories = loadCategories();
+    const categories = loadCategories();  // domains (same file)
 
     // Handle both new format (with properties/sources) and legacy format
     const totalProperties = dataTypes.reduce((sum, dt) => sum + (dt.properties?.length || 0), 0);
     const totalSources = dataTypes.reduce((sum, dt) => sum + (dt.sources?.length || 0), 0);
 
-    const categoryCounts = {};
+    // Count by domain (new multi-domain model)
+    const domainCounts = {};
     for (const dt of dataTypes) {
-      const cat = dt.category || 'other';
-      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+      // Use domains array if available, fall back to category
+      const domainsToCount = (dt.domains && dt.domains.length > 0)
+        ? dt.domains
+        : [dt.category || 'other'];
+      for (const domain of domainsToCount) {
+        domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+      }
     }
 
     res.json({
       totalDataTypes: dataTypes.length,
+      totalVocabTypes: dataTypes.length,  // Alias for Data Dictionary
       totalProperties,
       totalSources,
-      totalCategories: categories.length,
-      categoryCounts,
+      totalDomains: categories.length,
+      totalCategories: categories.length,  // Legacy alias
+      domainCounts,
+      categoryCounts: domainCounts,  // Legacy alias
     });
   } catch (error) {
     console.error('Error getting stats:', error);
@@ -953,11 +962,42 @@ router.post('/admin/reseed', (req, res) => {
 // Helper functions for vocab-type routes (reuse logic from data-types routes)
 const listVocabTypes = (req, res) => {
   try {
-    const { category, search } = req.query;
+    const { category, domain, domains, search } = req.query;
     let dataTypes = loadDataTypes();
 
-    if (category) {
-      dataTypes = dataTypes.filter(dt => dt.category === category);
+    // Support filtering by domain(s) - new multi-domain model
+    if (domain) {
+      dataTypes = dataTypes.filter(dt => {
+        // Support new domains array
+        if (dt.domains && dt.domains.length > 0) {
+          return dt.domains.includes(domain);
+        }
+        // Legacy: fall back to category field
+        return dt.category === domain;
+      });
+    }
+
+    // Support filtering by multiple domains (comma-separated) - OR logic
+    if (domains) {
+      const domainList = domains.split(',').map(d => d.trim());
+      dataTypes = dataTypes.filter(dt => {
+        // Support new domains array
+        if (dt.domains && dt.domains.length > 0) {
+          return dt.domains.some(d => domainList.includes(d));
+        }
+        // Legacy: fall back to category field
+        return domainList.includes(dt.category);
+      });
+    }
+
+    // Legacy category filter (for backwards compatibility)
+    if (category && !domain && !domains) {
+      dataTypes = dataTypes.filter(dt => {
+        if (dt.domains && dt.domains.length > 0) {
+          return dt.domains.includes(category);
+        }
+        return dt.category === category;
+      });
     }
 
     if (search && search.length >= 2) {
@@ -997,11 +1037,20 @@ const createVocabType = (req, res) => {
     const dataTypes = loadDataTypes();
     const now = new Date().toISOString();
 
+    // Support new domains array with fallback to legacy category
+    let domains = req.body.domains || [];
+    if (!Array.isArray(domains) || domains.length === 0) {
+      // Legacy: convert single category to domains array
+      const category = req.body.category || 'other';
+      domains = [category];
+    }
+
     const newDataType = {
       id: req.body.id || generateId(req.body.name),
       name: req.body.name,
       description: req.body.description || '',
-      category: req.body.category || 'other',
+      domains: domains,  // New multi-domain field
+      category: domains[0] || 'other',  // Legacy field for backwards compat
       parentTypeId: req.body.parentTypeId || null,
       properties: req.body.properties || [],
       sources: req.body.sources || [],
@@ -1042,11 +1091,27 @@ const updateVocabType = (req, res) => {
       return res.status(404).json({ error: 'Vocab type not found' });
     }
 
+    // Handle domains update with fallback to category
+    let domains = req.body.domains;
+    if (domains !== undefined) {
+      // New domains field provided
+      if (!Array.isArray(domains)) {
+        domains = domains ? [domains] : [];
+      }
+    } else if (req.body.category !== undefined) {
+      // Legacy: category provided, convert to domains
+      domains = [req.body.category];
+    } else {
+      // Keep existing domains/category
+      domains = dataTypes[index].domains || (dataTypes[index].category ? [dataTypes[index].category] : []);
+    }
+
     const updatedDataType = {
       ...dataTypes[index],
       name: req.body.name ?? dataTypes[index].name,
       description: req.body.description ?? dataTypes[index].description,
-      category: req.body.category ?? dataTypes[index].category,
+      domains: domains,  // New multi-domain field
+      category: domains[0] || dataTypes[index].category || 'other',  // Legacy field for backwards compat
       parentTypeId: req.body.parentTypeId !== undefined ? req.body.parentTypeId : dataTypes[index].parentTypeId,
       properties: req.body.properties ?? dataTypes[index].properties,
       sources: req.body.sources ?? dataTypes[index].sources,

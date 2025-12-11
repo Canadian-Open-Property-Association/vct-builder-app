@@ -1,40 +1,75 @@
 /**
  * Vocabulary Reference Component
  *
- * Documents the Data Catalogue vocabulary structure and how it integrates
+ * Documents the Data Dictionary vocabulary structure and how it integrates
  * with Schema Builder and other credential design tools.
  */
 
 import { useState, useEffect } from 'react';
-import { fetchCategories, fetchDataTypes, fetchCatalogueStats, DataType, DataTypeCategory } from '../../../services/catalogueApi';
+import { fetchDomains, fetchDataTypes, fetchCatalogueStats, DataType, DataTypeDomain } from '../../../services/catalogueApi';
+
+// Domain colors for badges
+const DOMAIN_COLORS: Record<string, string> = {
+  property: '#10B981',
+  financial: '#3B82F6',
+  identity: '#8B5CF6',
+  employment: '#F59E0B',
+  other: '#6B7280',
+  untagged: '#9CA3AF',
+};
 
 interface CatalogueStats {
   totalDataTypes: number;
   totalProperties: number;
   totalSources: number;
+  totalDomains: number;
   totalCategories: number;
+  domainCounts: Record<string, number>;
   categoryCounts: Record<string, number>;
 }
 
 export default function VocabReference() {
-  const [categories, setCategories] = useState<DataTypeCategory[]>([]);
+  const [domains, setDomains] = useState<DataTypeDomain[]>([]);
   const [dataTypes, setDataTypes] = useState<DataType[]>([]);
   const [stats, setStats] = useState<CatalogueStats | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Get domain color
+  const getDomainColor = (domainId: string) => {
+    const domain = domains.find(d => d.id === domainId);
+    return domain?.color || DOMAIN_COLORS[domainId] || '#6B7280';
+  };
+
+  // Get domain label
+  const getDomainLabel = (domainId: string) => {
+    const domain = domains.find(d => d.id === domainId);
+    return domain?.name || domainId.charAt(0).toUpperCase() + domainId.slice(1);
+  };
+
+  // Get domains for a vocab type (supporting both new and legacy format)
+  const getVocabTypeDomains = (vt: DataType): string[] => {
+    if (vt.domains && vt.domains.length > 0) {
+      return vt.domains;
+    }
+    if (vt.category) {
+      return [vt.category];
+    }
+    return [];
+  };
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [cats, types, catalogueStats] = await Promise.all([
-          fetchCategories(),
+        const [doms, types, catalogueStats] = await Promise.all([
+          fetchDomains(),
           fetchDataTypes(),
           fetchCatalogueStats(),
         ]);
-        setCategories(cats);
+        setDomains(doms);
         setDataTypes(types);
         setStats(catalogueStats);
       } catch (err) {
@@ -47,8 +82,11 @@ export default function VocabReference() {
     loadData();
   }, []);
 
-  const filteredDataTypes = selectedCategory
-    ? dataTypes.filter((dt) => dt.category === selectedCategory)
+  const filteredDataTypes = selectedDomain
+    ? dataTypes.filter((dt) => {
+        const vtDomains = getVocabTypeDomains(dt);
+        return vtDomains.includes(selectedDomain);
+      })
     : dataTypes;
 
   return (
@@ -106,7 +144,7 @@ export default function VocabReference() {
 
       {/* Live Statistics */}
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">Catalogue Statistics</h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Dictionary Statistics</h2>
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full"></div>
@@ -117,22 +155,18 @@ export default function VocabReference() {
             {error}
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-purple-600">{stats.totalDataTypes}</div>
-              <div className="text-sm text-gray-500">DataTypes</div>
+              <div className="text-sm text-gray-500">Vocab Types</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-blue-600">{stats.totalProperties}</div>
               <div className="text-sm text-gray-500">Properties</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-green-600">{stats.totalSources}</div>
-              <div className="text-sm text-gray-500">Data Sources</div>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-orange-600">{stats.totalCategories}</div>
-              <div className="text-sm text-gray-500">Categories</div>
+              <div className="text-3xl font-bold text-orange-600">{stats.totalDomains}</div>
+              <div className="text-sm text-gray-500">Domains</div>
             </div>
           </div>
         ) : null}
@@ -142,19 +176,17 @@ export default function VocabReference() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-gray-800 mb-3">Vocabulary Structure</h2>
         <div className="bg-gray-800 text-gray-100 rounded-lg p-4 font-mono text-sm overflow-x-auto">
-          <pre className="whitespace-pre">{`Categories (identity, property, financial, professional, badge)
-└── DataTypes (vocabulary domains)
+          <pre className="whitespace-pre">{`Domains (identity, property, financial, employment, other)
+└── VocabTypes (vocabulary groups - can belong to multiple domains)
     │   id: "homeowner-details" (kebab-case)
     │   name: "Homeowner Details"
-    │   category: "identity"
+    │   domains: ["identity", "property"]  (multi-domain tagging)
     │
     └── Properties (vocabulary terms)
             id: "prop-homeowner_first_name"
             name: "homeowner_first_name" (snake_case - canonical)
             displayName: "Homeowner First Name"
-            valueType: "string" | "number" | "date" | "currency" | ...
-            │
-            └── ProviderMappings (links to data furnisher fields)`}</pre>
+            valueType: "string" | "number" | "date" | "currency" | ...`}</pre>
         </div>
       </section>
 
@@ -205,20 +237,35 @@ export default function VocabReference() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-gray-800 mb-3">Browse Vocabulary</h2>
 
-        {/* Category Filter */}
-        <div className="mb-4">
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500"
+        {/* Domain Filter Chips */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedDomain(null)}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              selectedDomain === null
+                ? 'bg-gray-700 text-white'
+                : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
           >
-            <option value="">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
+            All
+          </button>
+          {domains.sort((a, b) => a.order - b.order).map(domain => {
+            const isActive = selectedDomain === domain.id;
+            return (
+              <button
+                key={domain.id}
+                onClick={() => setSelectedDomain(isActive ? null : domain.id)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  isActive
+                    ? 'text-white'
+                    : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+                style={isActive ? { backgroundColor: getDomainColor(domain.id) } : {}}
+              >
+                {domain.name}
+              </button>
+            );
+          })}
         </div>
 
         {/* DataTypes List */}
@@ -232,12 +279,18 @@ export default function VocabReference() {
           </div>
         ) : filteredDataTypes.length === 0 ? (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
-            No DataTypes found. Add vocabulary terms in the Data Catalogue app.
+            No vocabulary types found. Add vocabulary terms in the Data Dictionary app.
           </div>
         ) : (
           <div className="space-y-3">
             {filteredDataTypes.map((dt) => (
-              <DataTypeCard key={dt.id} dataType={dt} />
+              <DataTypeCard
+                key={dt.id}
+                dataType={dt}
+                getDomainColor={getDomainColor}
+                getDomainLabel={getDomainLabel}
+                getVocabTypeDomains={getVocabTypeDomains}
+              />
             ))}
           </div>
         )}
@@ -248,7 +301,7 @@ export default function VocabReference() {
         <h2 className="text-lg font-semibold text-gray-800 mb-3">Vocabulary API</h2>
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <p className="text-sm text-gray-600 mb-3">
-            The Data Catalogue API provides endpoints for accessing vocabulary terms, categories, and search functionality.
+            The Data Dictionary API provides endpoints for accessing vocabulary terms, domains, and search functionality.
           </p>
           <div className="flex gap-3">
             <a
@@ -263,7 +316,7 @@ export default function VocabReference() {
               Open Swagger UI
             </a>
             <code className="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg font-mono">
-              Base: /api/catalogue
+              Base: /api/dictionary
             </code>
           </div>
         </div>
@@ -273,8 +326,14 @@ export default function VocabReference() {
 }
 
 // DataType Card Component
-function DataTypeCard({ dataType }: { dataType: DataType }) {
+function DataTypeCard({ dataType, getDomainColor, getDomainLabel, getVocabTypeDomains }: {
+  dataType: DataType;
+  getDomainColor: (domainId: string) => string;
+  getDomainLabel: (domainId: string) => string;
+  getVocabTypeDomains: (vt: DataType) => string[];
+}) {
   const [expanded, setExpanded] = useState(false);
+  const vtDomains = getVocabTypeDomains(dataType);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -282,12 +341,18 @@ function DataTypeCard({ dataType }: { dataType: DataType }) {
         onClick={() => setExpanded(!expanded)}
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="font-medium">{dataType.name}</span>
           <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{dataType.id}</code>
-          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
-            {dataType.category}
-          </span>
+          {vtDomains.map(domainId => (
+            <span
+              key={domainId}
+              className="text-xs px-2 py-0.5 rounded text-white"
+              style={{ backgroundColor: getDomainColor(domainId) }}
+            >
+              {getDomainLabel(domainId)}
+            </span>
+          ))}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">{dataType.properties.length} properties</span>

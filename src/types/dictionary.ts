@@ -9,15 +9,20 @@ export interface UserRef {
 }
 
 // ============================================
-// Categories - for organizing vocabulary types
+// Domains - for organizing vocabulary types
+// Replaces rigid Category hierarchy with flexible multi-domain tagging
 // ============================================
 
-export interface VocabCategory {
+export interface VocabDomain {
   id: string;
   name: string;
   description?: string;
   order: number;
+  color?: string;  // Optional: for UI tag colors
 }
+
+// Backwards compatibility alias
+export type VocabCategory = VocabDomain;
 
 // ============================================
 // Value Types - supported property value types
@@ -84,9 +89,29 @@ export interface VocabProperty {
   // Sample/documentation
   sampleValue?: string;
 
+  // ============================================
+  // RESO Data Dictionary metadata (optional)
+  // ============================================
+
+  // Internationalization
+  displayNameFr?: string;          // French Canadian display name
+  displayNameEs?: string;          // Spanish display name
+
+  // RESO classification
+  resoGroups?: string[];           // RESO Groups (e.g., ["Structure", "Location"])
+  resoPropertyTypes?: string[];    // Applicable property types (e.g., ["RESI", "RLSE", "RINC"])
+  resoLookupName?: string;         // RESO lookup/enum reference
+  resoElementStatus?: string;      // RESO element status (Active, etc.)
+
+  // Related terms
+  synonyms?: string[];             // Alternative names for the field
+
+  // External documentation
+  wikiUrl?: string;                // RESO Wiki documentation URL
+
   // Metadata
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ============================================
@@ -98,7 +123,11 @@ export interface VocabType {
   id: string;                      // Slug-style ID (e.g., "property-valuation")
   name: string;                    // Display name (e.g., "Property Valuation")
   description?: string;
-  category: string;                // Category ID
+
+  // Domain tagging (replaces single category)
+  domains: string[];               // Multiple domain IDs (flexible tagging)
+  /** @deprecated Use domains[] instead */
+  category?: string;               // Legacy single category ID - kept for migration
 
   // Hierarchy support (type inheritance)
   parentTypeId?: string;           // Reference to parent VocabType
@@ -106,6 +135,10 @@ export interface VocabType {
 
   // Properties (attributes of this type)
   properties: VocabProperty[];
+
+  // Source tracking (for imported vocabularies like RESO)
+  source?: string;                 // e.g., "RESO", "COPA"
+  sourceVersion?: string;          // e.g., "2.0"
 
   // Metadata
   createdAt: string;
@@ -118,19 +151,25 @@ export interface VocabType {
 // API Response Types
 // ============================================
 
-export interface VocabTypeWithCategory extends VocabType {
-  categoryName?: string;           // Denormalized category name
+export interface VocabTypeWithDomains extends VocabType {
+  domainNames?: string[];          // Denormalized domain names
 }
+
+/** @deprecated Use VocabTypeWithDomains */
+export type VocabTypeWithCategory = VocabTypeWithDomains;
 
 export interface VocabTypeHierarchy {
   vocabType: VocabType;
   children: VocabTypeHierarchy[];
 }
 
-export interface CategoryWithTypes {
-  category: VocabCategory;
-  vocabTypes: VocabType[];
+export interface DomainWithTypes {
+  domain: VocabDomain;
+  vocabTypes: VocabType[];         // Types that have this domain in their domains[]
 }
+
+/** @deprecated Use DomainWithTypes */
+export type CategoryWithTypes = DomainWithTypes;
 
 // ============================================
 // Stats for display
@@ -143,7 +182,9 @@ export interface VocabTypeStats {
 export interface DictionaryStats {
   totalVocabTypes: number;
   totalProperties: number;
-  categoryCounts: Record<string, number>;
+  domainCounts: Record<string, number>;
+  /** @deprecated Use domainCounts */
+  categoryCounts?: Record<string, number>;
 }
 
 // ============================================
@@ -153,6 +194,23 @@ export interface DictionaryStats {
 export interface DictionaryExport {
   version: string;
   exportedAt: string;
-  categories: VocabCategory[];
+  domains: VocabDomain[];
+  /** @deprecated Use domains */
+  categories?: VocabCategory[];
   vocabTypes: VocabType[];
+}
+
+// ============================================
+// Migration Helper
+// ============================================
+
+/**
+ * Migrate legacy VocabType with single category to domains array
+ */
+export function migrateVocabTypeTodomains(vocabType: Partial<VocabType>): VocabType {
+  const { category, domains, ...rest } = vocabType as VocabType & { category?: string };
+  return {
+    ...rest,
+    domains: domains && domains.length > 0 ? domains : (category ? [category] : []),
+  } as VocabType;
 }

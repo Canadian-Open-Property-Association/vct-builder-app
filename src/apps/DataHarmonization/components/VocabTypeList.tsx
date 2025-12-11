@@ -1,11 +1,41 @@
 import { useHarmonizationStore } from '../../../store/harmonizationStore';
 
+// Domain colors for badges
+const DOMAIN_COLORS: Record<string, string> = {
+  property: '#10B981',
+  financial: '#3B82F6',
+  identity: '#8B5CF6',
+  employment: '#F59E0B',
+  other: '#6B7280',
+};
+
 export default function VocabTypeList() {
   const {
     vocabTypes,
     selectedVocabTypeId,
     selectVocabType,
   } = useHarmonizationStore();
+
+  // Get domains for a vocab type (supporting both new and legacy format)
+  const getVocabTypeDomains = (vt: typeof vocabTypes[0]): string[] => {
+    if (vt.domains && vt.domains.length > 0) {
+      return vt.domains;
+    }
+    if (vt.category) {
+      return [vt.category];
+    }
+    return [];
+  };
+
+  // Get domain color
+  const getDomainColor = (domainId: string) => {
+    return DOMAIN_COLORS[domainId] || '#6B7280';
+  };
+
+  // Get domain label
+  const getDomainLabel = (domainId: string) => {
+    return domainId.charAt(0).toUpperCase() + domainId.slice(1);
+  };
 
   if (vocabTypes.length === 0) {
     return (
@@ -24,6 +54,7 @@ export default function VocabTypeList() {
       {vocabTypes.map((vocabType) => {
         const isSelected = selectedVocabTypeId === vocabType.id;
         const propertyCount = vocabType.properties?.length || 0;
+        const vtDomains = getVocabTypeDomains(vocabType);
 
         return (
           <li
@@ -40,15 +71,20 @@ export default function VocabTypeList() {
                 <div className="font-medium text-sm text-gray-900 truncate">
                   {vocabType.name}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className="text-xs text-gray-500">
                     {propertyCount} propert{propertyCount !== 1 ? 'ies' : 'y'}
                   </span>
-                  {vocabType.category && (
-                    <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
-                      {vocabType.category}
+                  {/* Domain badges */}
+                  {vtDomains.map(domainId => (
+                    <span
+                      key={domainId}
+                      className="text-xs px-1.5 py-0.5 rounded text-white"
+                      style={{ backgroundColor: getDomainColor(domainId) }}
+                    >
+                      {getDomainLabel(domainId)}
                     </span>
-                  )}
+                  ))}
                 </div>
               </div>
 
