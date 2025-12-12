@@ -10,6 +10,7 @@ import {
   createDefaultProperty,
   toJsonSchema,
   toJsonLdContext,
+  DEFAULT_STANDARD_CLAIMS,
 } from '../types/schema';
 import { SchemaMode } from '../types/vocabulary';
 import { useVocabularyStore } from './vocabularyStore';
@@ -509,31 +510,14 @@ export const useSchemaStore = create<SchemaStore>()(
         try {
           const schema = JSON.parse(json);
 
-          // Parse required array to determine standard claims configuration
-          const requiredClaims = new Set(schema.required || []);
-          const hasProperty = (name: string) => schema.properties && name in schema.properties;
-
-          // Build standard claims config from schema
-          const standardClaims = {
-            iss: { required: requiredClaims.has('iss') },
-            iat: { required: requiredClaims.has('iat') },
-            vct: { required: requiredClaims.has('vct') },
-            exp: { required: requiredClaims.has('exp') },
-            nbf: { enabled: hasProperty('nbf'), required: requiredClaims.has('nbf') },
-            sub: { enabled: hasProperty('sub'), required: requiredClaims.has('sub') },
-            jti: { enabled: hasProperty('jti'), required: requiredClaims.has('jti') },
-            cnf: { enabled: hasProperty('cnf'), required: requiredClaims.has('cnf') },
-            status: { enabled: hasProperty('status'), required: requiredClaims.has('status') },
-          };
-
           // Parse JSON Schema back to internal format
+          // Simplified: we only care about credentialSubject now
           const metadata: SchemaMetadata = {
             schemaId: schema.$id || '',
             title: schema.title || '',
             description: schema.description || '',
-            governanceDocUrl: schema['x-governance-doc'],
-            governanceDocName: undefined,
-            standardClaims,
+            // Legacy field - no longer used in output but kept for compatibility
+            standardClaims: DEFAULT_STANDARD_CLAIMS,
             // Preserve the current mode when importing
             mode: get().metadata.mode,
             vocabUrl: undefined,

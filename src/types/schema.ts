@@ -332,6 +332,7 @@ export const createDefaultProperty = (id: string): SchemaProperty => ({
 });
 
 // Convert internal schema representation to JSON Schema Draft 2020-12
+// Outputs only credentialSubject validation - JWT wrapper claims are spec-defined
 export const toJsonSchema = (metadata: SchemaMetadata, properties: SchemaProperty[]): object => {
   const buildPropertySchema = (prop: SchemaProperty): object => {
     const schema: Record<string, unknown> = {
@@ -407,139 +408,25 @@ export const toJsonSchema = (metadata: SchemaMetadata, properties: SchemaPropert
   // Auto-generate $id from title if not provided
   const schemaId = metadata.schemaId || generateSchemaId(metadata.title);
 
-  // Get standard claims config (use defaults if not provided)
-  const claims = metadata.standardClaims || DEFAULT_STANDARD_CLAIMS;
-
-  // Build required array dynamically based on standard claims config
-  const required: string[] = ['credentialSubject'];
-  if (claims.iss.required) required.push('iss');
-  if (claims.iat.required) required.push('iat');
-  if (claims.vct.required) required.push('vct');
-  if (claims.exp.required) required.push('exp');
-  if (claims.nbf.enabled && claims.nbf.required) required.push('nbf');
-  if (claims.sub.enabled && claims.sub.required) required.push('sub');
-  if (claims.jti.enabled && claims.jti.required) required.push('jti');
-  if (claims.cnf.enabled && claims.cnf.required) required.push('cnf');
-  if (claims.status.enabled && claims.status.required) required.push('status');
-
-  // Build schema properties object
-  const schemaProperties: Record<string, object> = {};
-
-  // Always include core claims (iss, iat, exp, vct)
-  schemaProperties.iss = {
-    title: 'Issuer',
-    description: 'URI identifying the issuer of the credential.',
-    type: 'string',
-    format: 'uri',
-  };
-
-  schemaProperties.iat = {
-    title: 'Issued At',
-    description: 'Unix timestamp when the credential was issued.',
-    type: 'integer',
-  };
-
-  schemaProperties.exp = {
-    title: 'Expiration',
-    description: 'Unix timestamp when the credential expires.',
-    type: 'integer',
-  };
-
-  schemaProperties.vct = {
-    title: 'Verifiable Credential Type',
-    description: 'URI identifying the credential type.',
-    type: 'string',
-    format: 'uri',
-  };
-
-  // Add optional claims if enabled
-  if (claims.nbf.enabled) {
-    schemaProperties.nbf = {
-      title: 'Not Before',
-      description: 'Unix timestamp before which the credential is not valid.',
-      type: 'integer',
-    };
-  }
-
-  if (claims.sub.enabled) {
-    schemaProperties.sub = {
-      title: 'Subject',
-      description: 'Identifier for the subject of the credential.',
-      type: 'string',
-    };
-  }
-
-  if (claims.jti.enabled) {
-    schemaProperties.jti = {
-      title: 'JWT ID',
-      description: 'Unique identifier for the credential.',
-      type: 'string',
-      format: 'uuid',
-    };
-  }
-
-  if (claims.cnf.enabled) {
-    schemaProperties.cnf = {
-      title: 'Confirmation',
-      description: 'Holder binding confirmation claim.',
-      type: 'object',
-      properties: {
-        jwk: {
-          type: 'object',
-          description: 'JSON Web Key for holder binding',
-        },
-      },
-    };
-  }
-
-  if (claims.status.enabled) {
-    schemaProperties.status = {
-      title: 'Credential Status',
-      description: 'Information about the revocation status of the credential.',
-      type: 'object',
-      properties: {
-        status_list: {
-          type: 'object',
-          description: 'Status list reference for credential revocation',
-          properties: {
-            idx: {
-              type: 'integer',
-              description: 'Index in the status list',
-            },
-            uri: {
-              type: 'string',
-              format: 'uri',
-              description: 'URI of the status list',
-            },
-          },
-        },
-      },
-    };
-  }
-
-  // Add credentialSubject
-  schemaProperties.credentialSubject = {
-    title: 'Credential Subject',
-    description: 'Claims about the subject of the credential.',
-    type: 'object',
-    properties: credentialSubjectProps,
-    ...(credentialSubjectRequired.length > 0 ? { required: credentialSubjectRequired } : {}),
-  };
-
-  // Build full schema
+  // Build schema - only validates credentialSubject
+  // JWT wrapper claims (iss, iat, exp, vct, etc.) are spec-defined and don't need per-schema validation
   const schema: Record<string, unknown> = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: schemaId,
     title: metadata.title,
-    description: metadata.description,
     type: 'object',
-    required,
-    properties: schemaProperties,
+    properties: {
+      credentialSubject: {
+        type: 'object',
+        properties: credentialSubjectProps,
+        ...(credentialSubjectRequired.length > 0 ? { required: credentialSubjectRequired } : {}),
+      },
+    },
   };
 
-  // Add governance doc reference if present
-  if (metadata.governanceDocUrl) {
-    schema['x-governance-doc'] = metadata.governanceDocUrl;
+  // Only add description if present
+  if (metadata.description) {
+    schema.description = metadata.description;
   }
 
   return schema;
