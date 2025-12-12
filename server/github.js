@@ -5,7 +5,7 @@ const router = express.Router();
 
 // GitHub repo configuration
 const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'Canadian-Open-Property-Association';
-const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME || 'verifiable-credentials';
+const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME || 'governance';
 const VCT_FOLDER_PATH = process.env.VCT_FOLDER_PATH || 'credentials/vct';
 const SCHEMA_FOLDER_PATH = process.env.SCHEMA_FOLDER_PATH || 'credentials/schemas';
 const CONTEXT_FOLDER_PATH = process.env.CONTEXT_FOLDER_PATH || 'credentials/contexts';
