@@ -11,6 +11,7 @@ import githubRouter from './github.js';
 import catalogueRouter from './routes/catalogue.js';
 import entitiesRouter from './routes/entities.js';
 import harmonizationRouter from './routes/harmonization.js';
+import openapiRouter from './routes/openapi.js';
 import { initAccessLogger, logAccess, queryLogs, queryAnalytics } from './accessLogger.js';
 import { requireAdmin, isAdmin } from './adminMiddleware.js';
 import { specs, swaggerUi } from './swagger.js';
@@ -151,6 +152,7 @@ app.use('/api/catalogue', catalogueRouter);
 app.use('/api/dictionary', catalogueRouter);
 app.use('/api/entities', entitiesRouter);
 app.use('/api/harmonization', harmonizationRouter);
+app.use('/api/openapi', openapiRouter);
 
 // Swagger API documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs, {
