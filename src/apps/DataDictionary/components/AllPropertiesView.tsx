@@ -156,8 +156,13 @@ export default function AllPropertiesView({ onNavigateToProperty }: AllPropertie
     togglePropertyFavourite(prop.vocabTypeId, prop.id);
   };
 
-  // Handle row click - navigate to vocab type
+  // Handle row click - show property preview
   const handleRowClick = (prop: FlattenedProperty) => {
+    setPreviewProperty(prop);
+  };
+
+  // Handle navigation to vocab type (double-click or explicit button)
+  const handleNavigateToVocabType = (prop: FlattenedProperty) => {
     if (onNavigateToProperty) {
       onNavigateToProperty(prop.vocabTypeId, prop.id);
     } else {
@@ -409,10 +414,14 @@ export default function AllPropertiesView({ onNavigateToProperty }: AllPropertie
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{prop.description}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleNavigateToVocabType(prop)}
+                        className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 transition-colors"
+                        title="Go to vocab type"
+                      >
                         {prop.vocabTypeName}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {VALUE_TYPE_LABELS[prop.valueType] || prop.valueType}
@@ -435,14 +444,14 @@ export default function AllPropertiesView({ onNavigateToProperty }: AllPropertie
                         <span className="text-xs text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={(e) => { e.stopPropagation(); setPreviewProperty(prop); }}
-                        className="text-gray-400 hover:text-gray-600 p-1"
-                        title="View Details"
+                        onClick={() => handleNavigateToVocabType(prop)}
+                        className="text-gray-400 hover:text-blue-600 p-1"
+                        title="Go to vocab type"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
                       </button>
                     </td>
