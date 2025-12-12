@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useSchemaStore } from '../../store/schemaStore';
+import { useSchemaStore, reloadSchemaProjects } from '../../store/schemaStore';
 import { useAppTracking } from '../../hooks/useAppTracking';
 import SchemaToolbar from './components/SchemaToolbar';
 import SchemaInfoTab from './components/SchemaInfoTab';
@@ -84,6 +84,11 @@ export default function SchemaBuilderApp() {
   const closeSchema = useSchemaStore((state) => state.closeSchema);
   const isDirty = useSchemaStore((state) => state.isDirty);
   const isEditing = useSchemaStore((state) => state.isEditing);
+
+  // Load schema projects from server on mount
+  useEffect(() => {
+    reloadSchemaProjects();
+  }, []);
 
   // Reset to welcome screen when entering the app
   // This ensures users always start at the welcome screen when navigating to Schema Builder
