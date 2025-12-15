@@ -1452,4 +1452,112 @@ router.delete('/furnisher-field-favourites/:fieldFullId', (req, res) => {
   }
 });
 
+// -------------------- Furnisher Manager Settings --------------------
+// Configurable data provider types and entity statuses
+
+const getFurnisherSettingsFile = () => path.join(getDataDir(), 'furnisher-settings.json');
+
+// Default settings
+const getDefaultFurnisherSettings = () => ({
+  dataProviderTypes: [
+    { id: 'identity', label: 'Identity', description: 'Identity verification and personal information' },
+    { id: 'title-ownership', label: 'Title/Ownership', description: 'Property title and ownership records' },
+    { id: 'assessment', label: 'Assessment', description: 'Property assessment and valuation data' },
+    { id: 'market-value-estimate', label: 'Market Value Estimate', description: 'Real estate market valuations' },
+    { id: 'cost-of-ownership', label: 'Cost of Ownership', description: 'Ongoing property ownership costs' },
+    { id: 'mortgage-home-equity', label: 'Mortgage & Home Equity', description: 'Mortgage and home equity information' },
+    { id: 'municipal', label: 'Municipal', description: 'Municipal government data' },
+    { id: 'regulatory', label: 'Regulatory', description: 'Regulatory compliance and licensing' },
+    { id: 'employment', label: 'Employment', description: 'Employment and income verification' },
+  ],
+  entityStatuses: [
+    { id: 'active', label: 'Active', color: 'green' },
+    { id: 'pending', label: 'Pending', color: 'yellow' },
+    { id: 'inactive', label: 'Inactive', color: 'gray' },
+  ],
+});
+
+// Initialize furnisher settings file if it doesn't exist
+const ensureFurnisherSettingsFile = () => {
+  const file = getFurnisherSettingsFile();
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, JSON.stringify(getDefaultFurnisherSettings(), null, 2));
+  }
+};
+
+// Load furnisher settings
+const loadFurnisherSettings = () => {
+  ensureFurnisherSettingsFile();
+  const data = JSON.parse(fs.readFileSync(getFurnisherSettingsFile(), 'utf-8'));
+  // Ensure all required fields exist with defaults
+  const defaults = getDefaultFurnisherSettings();
+  return {
+    dataProviderTypes: data.dataProviderTypes || defaults.dataProviderTypes,
+    entityStatuses: data.entityStatuses || defaults.entityStatuses,
+  };
+};
+
+// Save furnisher settings
+const saveFurnisherSettings = (settings) => {
+  fs.writeFileSync(getFurnisherSettingsFile(), JSON.stringify(settings, null, 2));
+};
+
+// GET /api/catalogue/furnisher-settings - Get furnisher manager settings
+router.get('/furnisher-settings', (req, res) => {
+  try {
+    const settings = loadFurnisherSettings();
+    res.json(settings);
+  } catch (error) {
+    console.error('Error getting furnisher settings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/catalogue/furnisher-settings - Update furnisher manager settings
+router.put('/furnisher-settings', requireAuth, (req, res) => {
+  try {
+    const currentSettings = loadFurnisherSettings();
+    const updatedSettings = {
+      dataProviderTypes: req.body.dataProviderTypes ?? currentSettings.dataProviderTypes,
+      entityStatuses: req.body.entityStatuses ?? currentSettings.entityStatuses,
+    };
+
+    // Validate data provider types
+    if (updatedSettings.dataProviderTypes) {
+      for (const type of updatedSettings.dataProviderTypes) {
+        if (!type.id || !type.label) {
+          return res.status(400).json({ error: 'Each data provider type must have an id and label' });
+        }
+      }
+    }
+
+    // Validate entity statuses
+    if (updatedSettings.entityStatuses) {
+      for (const status of updatedSettings.entityStatuses) {
+        if (!status.id || !status.label) {
+          return res.status(400).json({ error: 'Each entity status must have an id and label' });
+        }
+      }
+    }
+
+    saveFurnisherSettings(updatedSettings);
+    res.json(updatedSettings);
+  } catch (error) {
+    console.error('Error updating furnisher settings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/catalogue/furnisher-settings/reset - Reset to default settings
+router.post('/furnisher-settings/reset', requireAuth, (req, res) => {
+  try {
+    const defaults = getDefaultFurnisherSettings();
+    saveFurnisherSettings(defaults);
+    res.json(defaults);
+  } catch (error) {
+    console.error('Error resetting furnisher settings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

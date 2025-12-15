@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Entity, FurnisherDataSchema, EntityAsset } from '../../../types/entity';
 import { migrateDataSchema, DATA_PROVIDER_TYPE_CONFIG, ALL_DATA_PROVIDER_TYPES } from '../../../types/entity';
 import { useEntityStore } from '../../../store/entityStore';
+import { useFurnisherSettingsStore } from '../../../store/furnisherSettingsStore';
 import { CANADIAN_REGIONS, normalizeRegions } from '../../../constants/regions';
 import DataSourcesSection from './DataSourcesSection';
 import AssetsSection from './AssetsSection';
@@ -97,6 +98,7 @@ function resolveLogoUri(logoUri: string | undefined): string | undefined {
 export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailProps) {
   const brandColour = entity.primaryColor || '#1a365d';
   const { updateEntity, selectEntity } = useEntityStore();
+  const { settings } = useFurnisherSettingsStore();
   const [activeTab, setActiveTab] = useState<'about' | 'data-schema' | 'assets'>('about');
 
   // Inline editing states
@@ -110,6 +112,9 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
   // Entity description editing state
   const [editingDescription, setEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(entity.description || '');
+
+  // Status editing state
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   // Track the current entity ID to reset tab only when switching entities
   const currentEntityIdRef = useRef(entity.id);
@@ -228,6 +233,36 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
       setEditedDescription(entity.description || '');
       setEditingDescription(false);
     }
+  };
+
+  // Change entity status
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      await updateEntity(entity.id, { status: newStatus as Entity['status'] });
+      setShowStatusDropdown(false);
+    } catch (error) {
+      console.error('Failed to update status:', error);
+    }
+  };
+
+  // Get status display info from settings
+  const getStatusConfig = (statusId: string) => {
+    if (!settings) return { label: statusId, color: 'gray' };
+    const status = settings.entityStatuses.find(s => s.id === statusId);
+    return status || { label: statusId, color: 'gray' };
+  };
+
+  const getStatusColorClasses = (color: string) => {
+    const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+      green: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
+      yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200' },
+      red: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' },
+      blue: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
+      gray: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200' },
+      purple: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
+      orange: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
+    };
+    return colorMap[color] || colorMap.gray;
   };
 
   const startEditing = (section: string) => {
@@ -350,6 +385,56 @@ export default function EntityDetail({ entity, onEdit: _onEdit }: EntityDetailPr
               </button>
             </div>
           )}
+
+          {/* Status Badge - editable */}
+          <div className="relative">
+            {(() => {
+              const statusConfig = getStatusConfig(entity.status);
+              const colorClasses = getStatusColorClasses(statusConfig.color);
+              return (
+                <>
+                  <button
+                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border} hover:opacity-80`}
+                    title="Click to change status"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                    {statusConfig.label}
+                    <svg className="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Status Dropdown */}
+                  {showStatusDropdown && settings && (
+                    <div className="absolute z-10 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px]">
+                      {settings.entityStatuses.map((status) => {
+                        const colors = getStatusColorClasses(status.color);
+                        const isSelected = entity.status === status.id;
+                        return (
+                          <button
+                            key={status.id}
+                            onClick={() => handleStatusChange(status.id)}
+                            className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-50 ${
+                              isSelected ? 'bg-gray-50' : ''
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${colors.bg} border ${colors.border}`}></span>
+                            <span className={isSelected ? 'font-medium' : ''}>{status.label}</span>
+                            {isSelected && (
+                              <svg className="w-4 h-4 ml-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
 
         </div>
 

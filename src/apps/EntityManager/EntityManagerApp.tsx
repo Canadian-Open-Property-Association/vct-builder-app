@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useEntityStore } from '../../store/entityStore';
 import { useHarmonizationStore } from '../../store/harmonizationStore';
+import { useFurnisherSettingsStore } from '../../store/furnisherSettingsStore';
 import EntityList from './components/EntityList';
 import EntityDetail from './components/EntityDetail';
 import EntityForm from './components/EntityForm';
 import EntityToolbar from './components/EntityToolbar';
 import SaveToRepoModal from './components/SaveToRepoModal';
+import SettingsModal from './components/SettingsModal';
 import MapView from './components/MapView';
 
 type ViewMode = 'list' | 'map';
@@ -22,16 +24,19 @@ export default function EntityManagerApp() {
   } = useEntityStore();
 
   const { fetchFieldFavourites } = useHarmonizationStore();
+  const { fetchSettings } = useFurnisherSettingsStore();
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showEntityForm, setShowEntityForm] = useState(false);
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
   const [showSaveToRepoModal, setShowSaveToRepoModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   useEffect(() => {
     fetchEntities();
     fetchFieldFavourites();
-  }, [fetchEntities, fetchFieldFavourites]);
+    fetchSettings();
+  }, [fetchEntities, fetchFieldFavourites, fetchSettings]);
 
   const handleAddEntity = () => {
     setEditingEntityId(null);
@@ -161,9 +166,9 @@ export default function EntityManagerApp() {
 
         {/* Actions */}
         <EntityToolbar
-          onAddEntity={handleAddEntity}
           onExport={handleExport}
           onSaveToRepo={() => setShowSaveToRepoModal(true)}
+          onOpenSettings={() => setShowSettingsModal(true)}
         />
       </div>
 
@@ -172,7 +177,7 @@ export default function EntityManagerApp() {
         <div className="flex-1 flex overflow-hidden p-4 gap-4">
           {/* Left Panel - Entity List */}
           <div className="w-80 flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-            <EntityList onEditEntity={handleEditEntity} />
+            <EntityList onEditEntity={handleEditEntity} onAddEntity={handleAddEntity} />
           </div>
 
           {/* Right Panel - Detail View */}
@@ -204,6 +209,11 @@ export default function EntityManagerApp() {
           selectedEntityId={selectedEntity?.id}
           onClose={() => setShowSaveToRepoModal(false)}
         />
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <SettingsModal onClose={() => setShowSettingsModal(false)} />
       )}
     </div>
   );

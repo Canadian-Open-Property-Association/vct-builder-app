@@ -4,11 +4,12 @@ import type { Entity, EntityAsset } from '../../../types/entity';
 
 interface EntityListProps {
   onEditEntity: (id: string) => void;
+  onAddEntity: () => void;
 }
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
-export default function EntityList({ onEditEntity }: EntityListProps) {
+export default function EntityList({ onEditEntity, onAddEntity }: EntityListProps) {
   const { entities, selectedEntity, selectEntity, searchQuery, setSearchQuery, deleteEntity } = useEntityStore();
   const [logoAssets, setLogoAssets] = useState<Record<string, string>>({});
 
@@ -72,15 +73,25 @@ export default function EntityList({ onEditEntity }: EntityListProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search Bar with Count */}
+      {/* Header with Add Button */}
       <div className="px-3 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-gray-500">
-            {filteredEntities.length} {filteredEntities.length === 1 ? 'entity' : 'entities'}
+            {filteredEntities.length} {filteredEntities.length === 1 ? 'furnisher' : 'furnishers'}
             {searchQuery && entities.length !== filteredEntities.length && (
               <span className="text-gray-400"> of {entities.length}</span>
             )}
           </span>
+          <button
+            onClick={onAddEntity}
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+            title="Add new furnisher"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add
+          </button>
         </div>
         <div className="relative">
           <svg
