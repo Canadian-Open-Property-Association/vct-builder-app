@@ -187,7 +187,19 @@ export default function EntityManagerApp() {
         </div>
       ) : (
         <div className="flex-1 overflow-hidden bg-gray-50">
-          <MapView entities={entities} onSelectEntity={handleMapSelectEntity} />
+          <MapView
+            entities={entities}
+            onSelectEntity={handleMapSelectEntity}
+            onAddEntity={handleAddEntity}
+            onEditEntity={handleEditEntity}
+            onDeleteEntity={async (id) => {
+              try {
+                await useEntityStore.getState().deleteEntity(id);
+              } catch (err) {
+                console.error('Failed to delete entity:', err);
+              }
+            }}
+          />
         </div>
       )}
 
