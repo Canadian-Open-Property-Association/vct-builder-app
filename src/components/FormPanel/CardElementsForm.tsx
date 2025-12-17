@@ -46,6 +46,9 @@ function DynamicZoneElementsForm({ template, displayIndex, claimPaths }: Dynamic
   // Track which individual zones are expanded (all start collapsed)
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
 
+  // Reset confirmation state
+  const [resetConfirmZone, setResetConfirmZone] = useState<{ face: 'front' | 'back'; zoneId: string } | null>(null);
+
   // Fetch settings on mount if not loaded
   useEffect(() => {
     if (!settings) {
@@ -66,8 +69,8 @@ function DynamicZoneElementsForm({ template, displayIndex, claimPaths }: Dynamic
     });
   };
 
-  // Reset a zone to default state
-  const handleResetZone = (face: 'front' | 'back', zoneId: string) => {
+  // Reset a zone to default state (called after confirmation)
+  const executeResetZone = (face: 'front' | 'back', zoneId: string) => {
     if (updateDynamicElement) {
       updateDynamicElement(displayIndex, face, zoneId, {
         content_type: 'text',
@@ -83,6 +86,12 @@ function DynamicZoneElementsForm({ template, displayIndex, claimPaths }: Dynamic
       });
     }
   };
+
+  // Show reset confirmation dialog
+  const handleResetZone = (face: 'front' | 'back', zoneId: string) => {
+    setResetConfirmZone({ face, zoneId });
+  };
+
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [assetPickerZoneId, setAssetPickerZoneId] = useState<string | null>(null);
   const [assetPickerFace, setAssetPickerFace] = useState<'front' | 'back'>('front');
@@ -294,30 +303,55 @@ function DynamicZoneElementsForm({ template, displayIndex, claimPaths }: Dynamic
             <div>
               <label className="block text-xs text-gray-500 mb-1">Source</label>
               <select
-                value={element?.claim_path || (element?.static_value ? '__static__' : '')}
+                value={element?.claim_path || (element?.static_value !== undefined ? '__static__' : '')}
                 onChange={(e) => {
-                  if (e.target.value === '__static__') {
+                  const value = e.target.value;
+                  if (value === '__static__') {
                     handleElementChange(face, zone.id, 'claim_path', undefined);
                     handleElementChange(face, zone.id, 'static_value', '');
+                  } else if (value.startsWith('__dynamic:')) {
+                    // Dynamic metadata options
+                    handleElementChange(face, zone.id, 'claim_path', value);
+                    handleElementChange(face, zone.id, 'static_value', undefined);
                   } else {
-                    handleElementChange(face, zone.id, 'claim_path', e.target.value || undefined);
+                    handleElementChange(face, zone.id, 'claim_path', value || undefined);
                     handleElementChange(face, zone.id, 'static_value', undefined);
                   }
                 }}
                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
               >
-                <option value="">Select claim...</option>
-                {claimPaths.map((cp) => (
-                  <option key={cp.path} value={cp.path}>
-                    {cp.label} ({cp.path})
-                  </option>
-                ))}
-                <option value="__static__">Static value</option>
+                <option value="">Select source...</option>
+                <optgroup label="Credential Metadata">
+                  <option value="__dynamic:credential_name">Credential Name</option>
+                  <option value="__dynamic:issuer_name">Issuer Name</option>
+                  <option value="__dynamic:issuer_logo">Issuer Logo URL</option>
+                  <option value="__dynamic:issuance_date">Issuance Date</option>
+                  <option value="__dynamic:expiration_date">Expiration Date</option>
+                </optgroup>
+                <optgroup label="Credential Claims">
+                  {claimPaths.map((cp) => (
+                    <option key={cp.path} value={cp.path}>
+                      {cp.label} ({cp.path})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="__static__">Static value</option>
+                </optgroup>
               </select>
             </div>
 
+            {/* Dynamic metadata info */}
+            {element?.claim_path?.startsWith('__dynamic:') && (
+              <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                <p className="text-xs text-blue-700">
+                  <strong>Dynamic:</strong> This value will be populated automatically at issuance time based on the credential metadata.
+                </p>
+              </div>
+            )}
+
             {/* Static value input */}
-            {!element?.claim_path && (
+            {element?.static_value !== undefined && !element?.claim_path && (
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Static Value</label>
                 <input
@@ -330,8 +364,8 @@ function DynamicZoneElementsForm({ template, displayIndex, claimPaths }: Dynamic
               </div>
             )}
 
-            {/* Label for claim-based */}
-            {element?.claim_path && (
+            {/* Label for claim-based (non-dynamic) */}
+            {element?.claim_path && !element?.claim_path.startsWith('__dynamic:') && (
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Display Label (optional)</label>
                 <input
@@ -799,6 +833,46 @@ function DynamicZoneElementsForm({ template, displayIndex, claimPaths }: Dynamic
         onSelect={handleAssetSelect}
         title="Select Zone Image"
       />
+
+      {/* Reset Zone Confirmation Dialog */}
+      {resetConfirmZone && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4 overflow-hidden">
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Reset Zone?</h3>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Are you sure you want to reset this zone? This will clear all configured content, images, and settings for this zone.
+              </p>
+            </div>
+            <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => setResetConfirmZone(null)}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  executeResetZone(resetConfirmZone.face, resetConfirmZone.zoneId);
+                  setResetConfirmZone(null);
+                }}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors"
+              >
+                Reset Zone
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

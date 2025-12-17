@@ -177,7 +177,7 @@ export default function EntityManagerApp() {
         <div className="flex-1 flex overflow-hidden p-4 gap-4">
           {/* Left Panel - Entity List */}
           <div className="w-80 flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-            <EntityList onEditEntity={handleEditEntity} onAddEntity={handleAddEntity} />
+            <EntityList onAddEntity={handleAddEntity} />
           </div>
 
           {/* Right Panel - Detail View */}
@@ -191,14 +191,6 @@ export default function EntityManagerApp() {
             entities={entities}
             onSelectEntity={handleMapSelectEntity}
             onAddEntity={handleAddEntity}
-            onEditEntity={handleEditEntity}
-            onDeleteEntity={async (id) => {
-              try {
-                await useEntityStore.getState().deleteEntity(id);
-              } catch (err) {
-                console.error('Failed to delete entity:', err);
-              }
-            }}
           />
         </div>
       )}
