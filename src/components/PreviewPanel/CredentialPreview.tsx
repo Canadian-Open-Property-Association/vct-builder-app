@@ -85,29 +85,35 @@ function AutoSizeText({
   );
 }
 
+// Zone overlay mode: 'off' = hidden, 'labels' = outlines only, 'interactive' = clickable
+type ZoneOverlayMode = 'off' | 'labels' | 'interactive';
+
 // Dynamic zones overlay for custom templates
 interface DynamicZonesOverlayProps {
   zones: Zone[];
   face: 'front' | 'back';
+  mode: ZoneOverlayMode;
 }
 
-function DynamicZonesOverlay({ zones, face }: DynamicZonesOverlayProps) {
+function DynamicZonesOverlay({ zones, face, mode }: DynamicZonesOverlayProps) {
   const hoveredZoneId = useZoneSelectionStore((state) => state.hoveredZoneId);
   const selectedZoneId = useZoneSelectionStore((state) => state.selectedZoneId);
   const setHoveredZone = useZoneSelectionStore((state) => state.setHoveredZone);
   const setSelectedZone = useZoneSelectionStore((state) => state.setSelectedZone);
 
+  const isInteractive = mode === 'interactive';
+
   return (
     <div className="absolute inset-0 z-10">
       {zones.map((zone, index) => {
         const color = getZoneColor(index);
-        const isHovered = hoveredZoneId === zone.id;
-        const isSelected = selectedZoneId === zone.id;
+        const isHovered = isInteractive && hoveredZoneId === zone.id;
+        const isSelected = isInteractive && selectedZoneId === zone.id;
 
         return (
           <div
             key={zone.id}
-            className="absolute flex items-center justify-center transition-all duration-150 cursor-pointer"
+            className={`absolute flex items-center justify-center transition-all duration-150 ${isInteractive ? 'cursor-pointer' : 'pointer-events-none'}`}
             style={{
               left: `${zone.position.x}%`,
               top: `${zone.position.y}%`,
@@ -121,11 +127,13 @@ function DynamicZonesOverlay({ zones, face }: DynamicZonesOverlayProps) {
               zIndex: isHovered || isSelected ? 20 : 10,
               boxShadow: isHovered || isSelected ? `0 0 8px ${color}` : 'none',
             }}
-            onMouseEnter={() => setHoveredZone(zone.id)}
-            onMouseLeave={() => setHoveredZone(null)}
+            onMouseEnter={() => isInteractive && setHoveredZone(zone.id)}
+            onMouseLeave={() => isInteractive && setHoveredZone(null)}
             onClick={(e) => {
-              e.stopPropagation();
-              setSelectedZone(zone.id, face);
+              if (isInteractive) {
+                e.stopPropagation();
+                setSelectedZone(zone.id, face);
+              }
             }}
           >
             <span
@@ -149,7 +157,18 @@ export default function CredentialPreview({ locale, cardSide }: CredentialPrevie
   const currentVct = useVctStore((state) => state.currentVct);
   const sampleData = useVctStore((state) => state.sampleData);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [showGridlines, setShowGridlines] = useState(false);
+  const [zoneOverlayMode, setZoneOverlayMode] = useState<ZoneOverlayMode>('off');
+
+  // Cycle through zone overlay modes: off -> labels -> interactive -> off
+  const cycleZoneMode = () => {
+    setZoneOverlayMode((prev) => {
+      switch (prev) {
+        case 'off': return 'labels';
+        case 'labels': return 'interactive';
+        case 'interactive': return 'off';
+      }
+    });
+  };
 
   // Zone template state
   const selectedTemplateId = useZoneTemplateStore((state) => state.selectedTemplateId);
@@ -304,8 +323,8 @@ export default function CredentialPreview({ locale, cardSide }: CredentialPrevie
             ) : (
               <div className="relative">
                 {renderDynamicCardFront()}
-                {showGridlines && selectedTemplate && (
-                  <DynamicZonesOverlay zones={selectedTemplate.front.zones} face="front" />
+                {zoneOverlayMode !== 'off' && selectedTemplate && (
+                  <DynamicZonesOverlay zones={selectedTemplate.front.zones} face="front" mode={zoneOverlayMode} />
                 )}
               </div>
             )}
@@ -324,8 +343,8 @@ export default function CredentialPreview({ locale, cardSide }: CredentialPrevie
             ) : (
               <div className="relative">
                 {renderDynamicCardBack()}
-                {showGridlines && selectedTemplate && (
-                  <DynamicZonesOverlay zones={selectedTemplate.back.zones} face="back" />
+                {zoneOverlayMode !== 'off' && selectedTemplate && (
+                  <DynamicZonesOverlay zones={selectedTemplate.back.zones} face="back" mode={zoneOverlayMode} />
                 )}
               </div>
             )}
@@ -343,23 +362,57 @@ export default function CredentialPreview({ locale, cardSide }: CredentialPrevie
             {selectedTemplate && ` • ${selectedTemplate.name}`}
           </p>
           <button
-            onClick={() => setShowGridlines(!showGridlines)}
+            onClick={cycleZoneMode}
             className={`text-xs px-2 py-1 rounded border transition-colors ${
-              showGridlines
+              zoneOverlayMode === 'interactive'
                 ? 'bg-blue-100 border-blue-300 text-blue-700'
+                : zoneOverlayMode === 'labels'
+                ? 'bg-purple-100 border-purple-300 text-purple-700'
                 : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
             }`}
+            title="Click to cycle: Off → Labels → Interactive → Off"
           >
-            {showGridlines ? '⊞ Hide Zones' : '⊞ Show Zones'}
+            {zoneOverlayMode === 'off' && '⊞ Show Zones'}
+            {zoneOverlayMode === 'labels' && '⊞ Zone Labels'}
+            {zoneOverlayMode === 'interactive' && '⊞ Click Zones'}
           </button>
         </div>
       </div>
     );
   };
 
-  // Helper to get claim value from sample data
+  // Helper to get dynamic metadata value (for __dynamic: prefixed values)
+  const getDynamicMetadataValue = (dynamicKey: string): string | undefined => {
+    switch (dynamicKey) {
+      case 'credential_name':
+        return currentVct.name || 'Credential Name';
+      case 'issuer_name':
+        return currentVct.issuer?.name || 'Issuer Name';
+      case 'issuer_logo':
+        return currentVct.issuer?.logoUri || undefined;
+      case 'issuance_date':
+        // For preview, show a sample date
+        return new Date().toLocaleDateString();
+      case 'expiration_date':
+        // For preview, show a sample date 1 year from now
+        const expDate = new Date();
+        expDate.setFullYear(expDate.getFullYear() + 1);
+        return expDate.toLocaleDateString();
+      default:
+        return undefined;
+    }
+  };
+
+  // Helper to get claim value from sample data or dynamic metadata
   const getClaimValue = (claimPath: string | undefined): string | undefined => {
     if (!claimPath) return undefined;
+
+    // Handle dynamic metadata values
+    if (claimPath.startsWith('__dynamic:')) {
+      const dynamicKey = claimPath.slice('__dynamic:'.length);
+      return getDynamicMetadataValue(dynamicKey);
+    }
+
     // Remove the $. prefix if present
     let normalizedPath = claimPath.startsWith('$.') ? claimPath.slice(2) : claimPath;
     // Remove credentialSubject. prefix to match how sample data is stored
