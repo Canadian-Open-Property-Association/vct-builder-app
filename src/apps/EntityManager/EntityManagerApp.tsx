@@ -18,6 +18,7 @@ export default function EntityManagerApp() {
     fetchEntities,
     selectedEntity,
     selectEntity,
+    clearSelection,
     isLoading,
     error,
     exportAll,
@@ -32,11 +33,16 @@ export default function EntityManagerApp() {
   const [showSaveToRepoModal, setShowSaveToRepoModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
+  // Reset to initial state when entering the app
   useEffect(() => {
+    // Clear any previous entity selection
+    clearSelection();
+
+    // Fetch data
     fetchEntities();
     fetchFieldFavourites();
     fetchSettings();
-  }, [fetchEntities, fetchFieldFavourites, fetchSettings]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddEntity = () => {
     setEditingEntityId(null);

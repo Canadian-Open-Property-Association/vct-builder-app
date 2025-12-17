@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Entity, EntitySelection } from '../types/entity';
+import { clearAssetCache } from '../services/assetResolver';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
@@ -176,6 +177,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   // Create entity
   createEntity: async (entity: Partial<Entity>) => {
     const result = await entityApi.createEntity(entity);
+    clearAssetCache(); // Clear VCT asset cache when entities change
     await get().fetchEntities();
     return result;
   },
@@ -183,6 +185,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   // Update entity
   updateEntity: async (id: string, updates: Partial<Entity> & { newId?: string }) => {
     const result = await entityApi.updateEntity(id, updates);
+    clearAssetCache(); // Clear VCT asset cache when entities change
     await get().fetchEntities();
     // Refresh selected entity - use new ID if it changed
     if (get().selectedEntity?.id === id) {
@@ -194,6 +197,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   // Delete entity
   deleteEntity: async (id: string) => {
     await entityApi.deleteEntity(id);
+    clearAssetCache(); // Clear VCT asset cache when entities change
     // Clear selection if deleted entity was selected
     if (get().selectedEntity?.id === id) {
       set({ selectedEntity: null, selection: null });

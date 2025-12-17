@@ -426,6 +426,9 @@ export default function CredentialPreview({ locale, cardSide, onZoneSelect }: Cr
     if (normalizedPath.startsWith('credentialSubject.')) {
       normalizedPath = normalizedPath.slice('credentialSubject.'.length);
     }
+    // Remove array index numbers (0, 1, 2, etc.) from the path to match formatPropertyPath
+    // which filters out [] placeholders. E.g., "addresses.0.street" -> "addresses.street"
+    normalizedPath = normalizedPath.split('.').filter(segment => !/^\d+$/.test(segment)).join('.');
     return sampleData[normalizedPath];
   };
 

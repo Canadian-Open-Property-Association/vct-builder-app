@@ -422,7 +422,7 @@ export default function VctBuilderApp() {
           `}
         >
           {/* Preview Controls */}
-          <div className="sticky top-0 bg-white px-4 py-2 border-b border-gray-200 flex flex-wrap items-center gap-4">
+          <div className="sticky top-0 z-10 bg-white px-4 py-2 border-b border-gray-200 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600">Language:</label>
               <select
