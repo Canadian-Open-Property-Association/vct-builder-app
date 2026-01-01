@@ -12,12 +12,12 @@ import {
   FormField,
   FormFieldType,
   FIELD_TYPE_LABELS,
-  PREDICATE_OPERATOR_LABELS,
-  PredicateOperator,
   createEmptyField,
   createEmptySection,
 } from '../../../types/forms';
 import FormPreview from './FormPreview';
+import CredentialFieldConfig from './CredentialFieldConfig';
+import { useAutoSave } from '../hooks/useAutoSave';
 
 // Resizable divider component
 function ResizableDivider({ onDrag }: { onDrag: (delta: number) => void }) {
@@ -83,6 +83,7 @@ export default function FormBuilder() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showFormSettings, setShowFormSettings] = useState(false);
 
   // Panel widths for resizable layout
   const [sectionsPanelWidth, setSectionsPanelWidth] = useState(240);
@@ -124,24 +125,44 @@ export default function FormBuilder() {
     }
   }, [currentForm, selectedSectionId]);
 
-  // Save form
+  // Save form function
+  const performSave = useCallback(async () => {
+    if (!currentForm || !id) return;
+
+    await updateForm(id, {
+      title: currentForm.title,
+      description: currentForm.description,
+      schema: currentForm.schema,
+    });
+    setHasUnsavedChanges(false);
+  }, [currentForm, id, updateForm]);
+
+  // Auto-save hook
+  const {
+    isSaving: isAutoSaving,
+    lastSaved,
+    error: autoSaveError,
+  } = useAutoSave({
+    data: currentForm?.schema,
+    onSave: performSave,
+    delay: 2000,
+    enabled: true,
+    hasChanges: hasUnsavedChanges,
+  });
+
+  // Manual save
   const handleSave = useCallback(async () => {
     if (!currentForm || !id) return;
 
     setIsSaving(true);
     try {
-      await updateForm(id, {
-        title: currentForm.title,
-        description: currentForm.description,
-        schema: currentForm.schema,
-      });
-      setHasUnsavedChanges(false);
+      await performSave();
     } catch (err) {
       // Error is handled in store
     } finally {
       setIsSaving(false);
     }
-  }, [currentForm, id, updateForm]);
+  }, [currentForm, id, performSave]);
 
   // Add a new section
   const handleAddSection = () => {
@@ -239,6 +260,28 @@ export default function FormBuilder() {
     if (selectedFieldId === fieldId) {
       setSelectedFieldId(null);
     }
+    setHasUnsavedChanges(true);
+  };
+
+  // Update info screen
+  const handleUpdateInfoScreen = (title: string, content: string) => {
+    if (!currentForm) return;
+    const newSchema = {
+      ...currentForm.schema,
+      infoScreen: title || content ? { title, content } : null,
+    };
+    updateCurrentFormSchema(newSchema);
+    setHasUnsavedChanges(true);
+  };
+
+  // Update success screen
+  const handleUpdateSuccessScreen = (title: string, content: string) => {
+    if (!currentForm) return;
+    const newSchema = {
+      ...currentForm.schema,
+      successScreen: { title, content },
+    };
+    updateCurrentFormSchema(newSchema);
     setHasUnsavedChanges(true);
   };
 
@@ -561,8 +604,26 @@ export default function FormBuilder() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {hasUnsavedChanges && (
+          {/* Status indicator */}
+          {isAutoSaving ? (
+            <span className="text-sm text-blue-600 flex items-center gap-1">
+              <div className="animate-spin rounded-full h-3 w-3 border-2 border-blue-600 border-t-transparent"></div>
+              Saving...
+            </span>
+          ) : hasUnsavedChanges ? (
             <span className="text-sm text-amber-600">Unsaved changes</span>
+          ) : lastSaved ? (
+            <span className="text-sm text-green-600 flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Saved
+            </span>
+          ) : null}
+          {autoSaveError && (
+            <span className="text-sm text-red-600" title={autoSaveError}>
+              Auto-save failed
+            </span>
           )}
           <button
             onClick={() => setShowPreview(true)}
@@ -576,7 +637,7 @@ export default function FormBuilder() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || !hasUnsavedChanges}
+            disabled={isSaving || isAutoSaving || !hasUnsavedChanges}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSaving && (
@@ -613,9 +674,10 @@ export default function FormBuilder() {
                 onClick={() => {
                   setSelectedSectionId(section.id);
                   setSelectedFieldId(null);
+                  setShowFormSettings(false);
                 }}
                 className={`p-3 rounded-lg cursor-pointer mb-2 ${
-                  selectedSectionId === section.id
+                  selectedSectionId === section.id && !showFormSettings
                     ? 'bg-blue-100 border border-blue-300'
                     : 'bg-white border border-gray-200 hover:border-gray-300'
                 }`}
@@ -641,15 +703,138 @@ export default function FormBuilder() {
                 </span>
               </div>
             ))}
+
+            {/* Form Settings button */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowFormSettings(true);
+                  setSelectedFieldId(null);
+                }}
+                className={`w-full p-3 rounded-lg cursor-pointer flex items-center gap-2 ${
+                  showFormSettings
+                    ? 'bg-purple-100 border border-purple-300'
+                    : 'bg-white border border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="text-sm font-medium text-gray-700">Form Settings</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Resizable divider between sections and fields */}
         <ResizableDivider onDrag={handleSectionsDividerDrag} />
 
-        {/* Fields area */}
+        {/* Fields area / Form Settings area */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {selectedSection && (
+          {/* Form Settings View */}
+          {showFormSettings && (
+            <div className="flex-1 overflow-y-auto p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Form Settings
+              </h2>
+
+              {/* Info Screen */}
+              <div className="mb-8 bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="font-semibold text-gray-800">Info Screen (Optional)</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  Shown before the form. Use this to provide instructions or context to respondents.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={currentForm.schema.infoScreen?.title || ''}
+                      onChange={(e) =>
+                        handleUpdateInfoScreen(e.target.value, currentForm.schema.infoScreen?.content || '')
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="e.g., Before You Begin"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Content
+                    </label>
+                    <textarea
+                      value={currentForm.schema.infoScreen?.content || ''}
+                      onChange={(e) =>
+                        handleUpdateInfoScreen(currentForm.schema.infoScreen?.title || '', e.target.value)
+                      }
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                      placeholder="Instructions or information to display before the form..."
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Markdown is supported</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Success Screen */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="font-semibold text-gray-800">Success Screen</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  Shown after successful form submission.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={currentForm.schema.successScreen.title}
+                      onChange={(e) =>
+                        handleUpdateSuccessScreen(e.target.value, currentForm.schema.successScreen.content)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="e.g., Thank you!"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Content
+                    </label>
+                    <textarea
+                      value={currentForm.schema.successScreen.content}
+                      onChange={(e) =>
+                        handleUpdateSuccessScreen(currentForm.schema.successScreen.title, e.target.value)
+                      }
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                      placeholder="Message to display after successful submission..."
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Markdown is supported</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section Fields View */}
+          {selectedSection && !showFormSettings && (
             <>
               {/* Section header */}
               <div className="p-4 border-b bg-white">
@@ -953,197 +1138,12 @@ export default function FormBuilder() {
                 </div>
               )}
 
-              {/* Verified Credential Configuration */}
+              {/* Verifiable Credential Configuration */}
               {selectedField.type === 'verified-credential' && (
-                <div className="border-t pt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    Credential Proof Configuration
-                  </h4>
-
-                  {/* Attribute Path */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Attribute to Verify
-                    </label>
-                    <input
-                      type="text"
-                      value={selectedField.credentialConfig?.attributePath || ''}
-                      onChange={(e) =>
-                        handleUpdateField(selectedSectionId!, selectedField.id, {
-                          credentialConfig: {
-                            ...selectedField.credentialConfig,
-                            attributePath: e.target.value,
-                          },
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-                      placeholder="e.g., credit_score, annual_income"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      The credential attribute that will be verified
-                    </p>
-                  </div>
-
-                  {/* Predicate Configuration */}
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        id="enable-predicate"
-                        checked={!!selectedField.credentialConfig?.predicate}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            handleUpdateField(selectedSectionId!, selectedField.id, {
-                              credentialConfig: {
-                                ...selectedField.credentialConfig,
-                                predicate: {
-                                  operator: '==',
-                                  value: '',
-                                },
-                              },
-                            });
-                          } else {
-                            const { predicate, ...rest } = selectedField.credentialConfig || {};
-                            handleUpdateField(selectedSectionId!, selectedField.id, {
-                              credentialConfig: rest,
-                            });
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="enable-predicate" className="text-sm font-medium text-gray-700">
-                        Predicate Rule (optional)
-                      </label>
-                    </div>
-                    {selectedField.credentialConfig?.predicate && (
-                      <>
-                        <div className="flex gap-2">
-                          <select
-                            value={selectedField.credentialConfig?.predicate?.operator || '=='}
-                            onChange={(e) =>
-                              handleUpdateField(selectedSectionId!, selectedField.id, {
-                                credentialConfig: {
-                                  ...selectedField.credentialConfig,
-                                  predicate: {
-                                    operator: e.target.value as PredicateOperator,
-                                    value: selectedField.credentialConfig?.predicate?.value ?? '',
-                                  },
-                                },
-                              })
-                            }
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            {(Object.entries(PREDICATE_OPERATOR_LABELS) as [PredicateOperator, string][]).map(
-                              ([op, label]) => (
-                                <option key={op} value={op}>
-                                  {op} ({label})
-                                </option>
-                              )
-                            )}
-                          </select>
-                          <input
-                            type="text"
-                            value={String(selectedField.credentialConfig?.predicate?.value ?? '')}
-                            onChange={(e) => {
-                              // Try to parse as number, boolean, or keep as string
-                              let value: string | number | boolean = e.target.value;
-                              if (e.target.value === 'true') value = true;
-                              else if (e.target.value === 'false') value = false;
-                              else if (!isNaN(Number(e.target.value)) && e.target.value !== '') {
-                                value = Number(e.target.value);
-                              }
-                              handleUpdateField(selectedSectionId!, selectedField.id, {
-                                credentialConfig: {
-                                  ...selectedField.credentialConfig,
-                                  predicate: {
-                                    operator: selectedField.credentialConfig?.predicate?.operator || '==',
-                                    value,
-                                  },
-                                },
-                              });
-                            }}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
-                            placeholder="e.g., 680, true, 50000"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          The condition the credential attribute must satisfy
-                        </p>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Accepted Issuers */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Accepted Issuers (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={selectedField.credentialConfig?.acceptedIssuers?.join(', ') || ''}
-                      onChange={(e) =>
-                        handleUpdateField(selectedSectionId!, selectedField.id, {
-                          credentialConfig: {
-                            ...selectedField.credentialConfig,
-                            acceptedIssuers: e.target.value
-                              .split(',')
-                              .map((s) => s.trim())
-                              .filter((s) => s.length > 0),
-                          },
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      placeholder="e.g., Equifax, TransUnion, CRA"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Comma-separated list of trusted credential issuers
-                    </p>
-                  </div>
-
-                  {/* Schema/CredDef IDs */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Schema ID (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={selectedField.credentialConfig?.schemaId || ''}
-                      onChange={(e) =>
-                        handleUpdateField(selectedSectionId!, selectedField.id, {
-                          credentialConfig: {
-                            ...selectedField.credentialConfig,
-                            schemaId: e.target.value,
-                          },
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
-                      placeholder="did:indy:..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Credential Definition ID (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={selectedField.credentialConfig?.credDefId || ''}
-                      onChange={(e) =>
-                        handleUpdateField(selectedSectionId!, selectedField.id, {
-                          credentialConfig: {
-                            ...selectedField.credentialConfig,
-                            credDefId: e.target.value,
-                          },
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
-                      placeholder="did:indy:..."
-                    />
-                  </div>
-                </div>
+                <CredentialFieldConfig
+                  field={selectedField}
+                  onUpdate={(updates) => handleUpdateField(selectedSectionId!, selectedField.id, updates)}
+                />
               )}
             </div>
           </div>

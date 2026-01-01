@@ -9,6 +9,8 @@ import { Routes, Route } from 'react-router-dom';
 import { useAppTracking } from '../../hooks/useAppTracking';
 import FormsList from './components/FormsList';
 import FormBuilder from './components/FormBuilder';
+import SubmissionsList from './components/SubmissionsList';
+import SubmissionDetail from './components/SubmissionDetail';
 
 export default function FormsBuilderApp() {
   useAppTracking('forms-builder', 'Forms Builder');
@@ -19,6 +21,8 @@ export default function FormsBuilderApp() {
         <Route path="/" element={<FormsList />} />
         <Route path="/new" element={<FormBuilder />} />
         <Route path="/edit/:id" element={<FormBuilder />} />
+        <Route path="/submissions" element={<SubmissionsList />} />
+        <Route path="/submissions/:id" element={<SubmissionDetail />} />
       </Routes>
     </div>
   );

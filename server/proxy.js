@@ -16,6 +16,7 @@ import { initAccessLogger, logAccess, queryLogs, queryAnalytics } from './access
 import { requireAdmin, isAdmin } from './adminMiddleware.js';
 import { specs, swaggerUi } from './swagger.js';
 import formsRouter from './routes/forms.js';
+import submissionsRouter from './routes/submissions.js';
 import { initializeDatabase } from './db/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -156,6 +157,7 @@ app.use('/api/entities', entitiesRouter);
 app.use('/api/harmonization', harmonizationRouter);
 app.use('/api/openapi', openapiRouter);
 app.use('/api/forms', formsRouter);
+app.use('/api', submissionsRouter);
 
 // Swagger API documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs, {
