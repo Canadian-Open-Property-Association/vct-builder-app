@@ -5,7 +5,7 @@
  * Supports adding sections, fields, and configuring form settings.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useFormsStore } from '../../../store/formsStore';
 import {
@@ -18,6 +18,51 @@ import {
   createEmptySection,
 } from '../../../types/forms';
 import FormPreview from './FormPreview';
+
+// Resizable divider component
+function ResizableDivider({ onDrag }: { onDrag: (delta: number) => void }) {
+  const [isDragging, setIsDragging] = useState(false);
+  const startXRef = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    startXRef.current = e.clientX;
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startXRef.current;
+      startXRef.current = e.clientX;
+      onDrag(delta);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, onDrag]);
+
+  return (
+    <div
+      className={`w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 flex items-center justify-center transition-colors ${
+        isDragging ? 'bg-blue-500' : ''
+      }`}
+      onMouseDown={handleMouseDown}
+    >
+      <div className="w-0.5 h-8 bg-gray-400 rounded" />
+    </div>
+  );
+}
 
 export default function FormBuilder() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +83,29 @@ export default function FormBuilder() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Panel widths for resizable layout
+  const [sectionsPanelWidth, setSectionsPanelWidth] = useState(240);
+  const [fieldSettingsPanelWidth, setFieldSettingsPanelWidth] = useState(320);
+
+  // Panel width constraints
+  const MIN_SECTIONS_WIDTH = 180;
+  const MAX_SECTIONS_WIDTH = 400;
+  const MIN_SETTINGS_WIDTH = 280;
+  const MAX_SETTINGS_WIDTH = 500;
+
+  const handleSectionsDividerDrag = useCallback((delta: number) => {
+    setSectionsPanelWidth((prev) =>
+      Math.max(MIN_SECTIONS_WIDTH, Math.min(MAX_SECTIONS_WIDTH, prev + delta))
+    );
+  }, []);
+
+  const handleSettingsDividerDrag = useCallback((delta: number) => {
+    // Negative delta means dragging left (making settings panel wider)
+    setFieldSettingsPanelWidth((prev) =>
+      Math.max(MIN_SETTINGS_WIDTH, Math.min(MAX_SETTINGS_WIDTH, prev - delta))
+    );
+  }, []);
 
   // Fetch form on mount
   useEffect(() => {
@@ -522,7 +590,10 @@ export default function FormBuilder() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sections sidebar */}
-        <div className="w-64 border-r bg-gray-50 flex flex-col">
+        <div
+          className="bg-gray-50 flex flex-col flex-shrink-0"
+          style={{ width: `${sectionsPanelWidth}px` }}
+        >
           <div className="p-4 border-b bg-white">
             <h3 className="font-semibold text-gray-700 mb-2">Sections</h3>
             <button
@@ -573,8 +644,11 @@ export default function FormBuilder() {
           </div>
         </div>
 
+        {/* Resizable divider between sections and fields */}
+        <ResizableDivider onDrag={handleSectionsDividerDrag} />
+
         {/* Fields area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {selectedSection && (
             <>
               {/* Section header */}
@@ -667,9 +741,15 @@ export default function FormBuilder() {
           )}
         </div>
 
+        {/* Resizable divider between fields and settings (only when field is selected) */}
+        {selectedField && <ResizableDivider onDrag={handleSettingsDividerDrag} />}
+
         {/* Field editor sidebar */}
         {selectedField && (
-          <div className="w-80 border-l bg-white flex flex-col min-h-0">
+          <div
+            className="bg-white flex flex-col min-h-0 flex-shrink-0"
+            style={{ width: `${fieldSettingsPanelWidth}px` }}
+          >
             <div className="p-4 border-b flex-shrink-0">
               <h3 className="font-semibold text-gray-700">Field Settings</h3>
             </div>

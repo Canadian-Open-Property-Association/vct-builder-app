@@ -157,7 +157,7 @@ export const FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
   select: 'Dropdown',
   radio: 'Radio Buttons',
   checkbox: 'Checkboxes',
-  'verified-credential': 'Verified Credential',
+  'verified-credential': 'Verifiable Credential',
 };
 
 // Default form schema for new forms
