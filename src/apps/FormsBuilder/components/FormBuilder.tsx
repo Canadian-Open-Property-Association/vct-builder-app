@@ -669,11 +669,11 @@ export default function FormBuilder() {
 
         {/* Field editor sidebar */}
         {selectedField && (
-          <div className="w-80 border-l bg-white overflow-y-auto">
-            <div className="p-4 border-b">
+          <div className="w-80 border-l bg-white flex flex-col min-h-0">
+            <div className="p-4 border-b flex-shrink-0">
               <h3 className="font-semibold text-gray-700">Field Settings</h3>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Label */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -909,61 +909,91 @@ export default function FormBuilder() {
 
                   {/* Predicate Configuration */}
                   <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Predicate Rule
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={selectedField.credentialConfig?.predicate?.operator || '=='}
-                        onChange={(e) =>
-                          handleUpdateField(selectedSectionId!, selectedField.id, {
-                            credentialConfig: {
-                              ...selectedField.credentialConfig,
-                              predicate: {
-                                operator: e.target.value as PredicateOperator,
-                                value: selectedField.credentialConfig?.predicate?.value ?? '',
-                              },
-                            },
-                          })
-                        }
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        {(Object.entries(PREDICATE_OPERATOR_LABELS) as [PredicateOperator, string][]).map(
-                          ([op, label]) => (
-                            <option key={op} value={op}>
-                              {op} ({label})
-                            </option>
-                          )
-                        )}
-                      </select>
+                    <div className="flex items-center gap-2 mb-2">
                       <input
-                        type="text"
-                        value={String(selectedField.credentialConfig?.predicate?.value ?? '')}
+                        type="checkbox"
+                        id="enable-predicate"
+                        checked={!!selectedField.credentialConfig?.predicate}
                         onChange={(e) => {
-                          // Try to parse as number, boolean, or keep as string
-                          let value: string | number | boolean = e.target.value;
-                          if (e.target.value === 'true') value = true;
-                          else if (e.target.value === 'false') value = false;
-                          else if (!isNaN(Number(e.target.value)) && e.target.value !== '') {
-                            value = Number(e.target.value);
-                          }
-                          handleUpdateField(selectedSectionId!, selectedField.id, {
-                            credentialConfig: {
-                              ...selectedField.credentialConfig,
-                              predicate: {
-                                operator: selectedField.credentialConfig?.predicate?.operator || '==',
-                                value,
+                          if (e.target.checked) {
+                            handleUpdateField(selectedSectionId!, selectedField.id, {
+                              credentialConfig: {
+                                ...selectedField.credentialConfig,
+                                predicate: {
+                                  operator: '==',
+                                  value: '',
+                                },
                               },
-                            },
-                          });
+                            });
+                          } else {
+                            const { predicate, ...rest } = selectedField.credentialConfig || {};
+                            handleUpdateField(selectedSectionId!, selectedField.id, {
+                              credentialConfig: rest,
+                            });
+                          }
                         }}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
-                        placeholder="e.g., 680, true, 50000"
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
+                      <label htmlFor="enable-predicate" className="text-sm font-medium text-gray-700">
+                        Predicate Rule (optional)
+                      </label>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      The condition the credential attribute must satisfy
-                    </p>
+                    {selectedField.credentialConfig?.predicate && (
+                      <>
+                        <div className="flex gap-2">
+                          <select
+                            value={selectedField.credentialConfig?.predicate?.operator || '=='}
+                            onChange={(e) =>
+                              handleUpdateField(selectedSectionId!, selectedField.id, {
+                                credentialConfig: {
+                                  ...selectedField.credentialConfig,
+                                  predicate: {
+                                    operator: e.target.value as PredicateOperator,
+                                    value: selectedField.credentialConfig?.predicate?.value ?? '',
+                                  },
+                                },
+                              })
+                            }
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            {(Object.entries(PREDICATE_OPERATOR_LABELS) as [PredicateOperator, string][]).map(
+                              ([op, label]) => (
+                                <option key={op} value={op}>
+                                  {op} ({label})
+                                </option>
+                              )
+                            )}
+                          </select>
+                          <input
+                            type="text"
+                            value={String(selectedField.credentialConfig?.predicate?.value ?? '')}
+                            onChange={(e) => {
+                              // Try to parse as number, boolean, or keep as string
+                              let value: string | number | boolean = e.target.value;
+                              if (e.target.value === 'true') value = true;
+                              else if (e.target.value === 'false') value = false;
+                              else if (!isNaN(Number(e.target.value)) && e.target.value !== '') {
+                                value = Number(e.target.value);
+                              }
+                              handleUpdateField(selectedSectionId!, selectedField.id, {
+                                credentialConfig: {
+                                  ...selectedField.credentialConfig,
+                                  predicate: {
+                                    operator: selectedField.credentialConfig?.predicate?.operator || '==',
+                                    value,
+                                  },
+                                },
+                              });
+                            }}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                            placeholder="e.g., 680, true, 50000"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          The condition the credential attribute must satisfy
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {/* Accepted Issuers */}
