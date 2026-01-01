@@ -6,11 +6,40 @@ import type { Entity } from '../../../types/entity';
 
 interface EntityListProps {
   onAddEntity: () => void;
+  // Optional props for external control (used by MapView)
+  externalEntities?: Entity[];
+  externalSearchQuery?: string;
+  onExternalSearchChange?: (query: string) => void;
+  externalSelectedId?: string | null;
+  onExternalSelectEntity?: (id: string | null) => void;
+  filterLabel?: string;
+  onClearFilter?: () => void;
+  headerContent?: React.ReactNode;
 }
 
-export default function EntityList({ onAddEntity }: EntityListProps) {
-  const { entities, selectedEntity, selectEntity, searchQuery, setSearchQuery } = useEntityStore();
+export default function EntityList({
+  onAddEntity,
+  externalEntities,
+  externalSearchQuery,
+  onExternalSearchChange,
+  externalSelectedId,
+  onExternalSelectEntity,
+  filterLabel,
+  onClearFilter,
+  headerContent,
+}: EntityListProps) {
+  const { entities: storeEntities, selectedEntity: storeSelectedEntity, selectEntity: storeSelectEntity, searchQuery: storeSearchQuery, setSearchQuery: storeSetSearchQuery } = useEntityStore();
   const { settings } = useFurnisherSettingsStore();
+
+  // Use external props if provided, otherwise use store
+  const isExternallyControlled = externalEntities !== undefined;
+  const entities = externalEntities ?? storeEntities;
+  const searchQuery = externalSearchQuery ?? storeSearchQuery;
+  const setSearchQuery = onExternalSearchChange ?? storeSetSearchQuery;
+  const selectedEntityId = isExternallyControlled ? externalSelectedId : storeSelectedEntity?.id;
+  const handleSelectEntity = isExternallyControlled
+    ? (id: string) => onExternalSelectEntity?.(selectedEntityId === id ? null : id)
+    : (id: string) => storeSelectEntity(id);
   const { fetchLogos, getLogoUrl } = useLogoStore();
   const entityRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -40,11 +69,11 @@ export default function EntityList({ onAddEntity }: EntityListProps) {
 
   // Auto-scroll to selected entity when it changes
   useEffect(() => {
-    if (selectedEntity && entityRefs.current[selectedEntity.id]) {
-      const element = entityRefs.current[selectedEntity.id];
+    if (selectedEntityId && entityRefs.current[selectedEntityId]) {
+      const element = entityRefs.current[selectedEntityId];
       element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [selectedEntity?.id]);
+  }, [selectedEntityId]);
 
   // Get logo URL for an entity - prefer local asset, fall back to entity.logoUri
   const getEntityLogo = (entity: Entity): string | null => {
@@ -116,6 +145,27 @@ export default function EntityList({ onAddEntity }: EntityListProps) {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
+        {/* Filter indicator (e.g., province filter from MapView) */}
+        {filterLabel && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs text-gray-500">Filtered to:</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
+              {filterLabel}
+              {onClearFilter && (
+                <button
+                  onClick={onClearFilter}
+                  className="hover:text-blue-900"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </span>
+          </div>
+        )}
+        {/* Optional header content */}
+        {headerContent}
       </div>
 
       {/* Empty state */}
@@ -135,7 +185,7 @@ export default function EntityList({ onAddEntity }: EntityListProps) {
           <div>
             {filteredEntities.map((entity, index) => {
               const logoUrl = getEntityLogo(entity);
-              const isSelected = selectedEntity?.id === entity.id;
+              const isSelected = selectedEntityId === entity.id;
               const isNetworkOperator = entity.entityTypes?.includes('network-operator');
               const previousEntity = index > 0 ? filteredEntities[index - 1] : null;
               const showSeparator = previousEntity?.entityTypes?.includes('network-operator') && !isNetworkOperator;
@@ -152,7 +202,7 @@ export default function EntityList({ onAddEntity }: EntityListProps) {
                   )}
                   <div
                     ref={(el) => { entityRefs.current[entity.id] = el; }}
-                    onClick={() => selectEntity(entity.id)}
+                    onClick={() => handleSelectEntity(entity.id)}
                     className={`group p-3 cursor-pointer transition-colors border-l-4 ${
                       isNetworkOperator
                         ? isSelected
