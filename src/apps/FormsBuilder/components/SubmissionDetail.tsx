@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FormSchema, FormField } from '../../../types/forms';
+import type { FormSchema } from '../../../types/forms';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
@@ -78,14 +78,6 @@ export default function SubmissionDetail() {
     if (Array.isArray(value)) return value.join(', ');
     if (typeof value === 'object') return JSON.stringify(value, null, 2);
     return String(value);
-  };
-
-  const getFieldLabel = (fieldName: string, schema: FormSchema): string => {
-    for (const section of schema.sections) {
-      const field = section.fields.find((f) => f.name === fieldName);
-      if (field) return field.label || fieldName;
-    }
-    return fieldName;
   };
 
   const copyToClipboard = (text: string) => {

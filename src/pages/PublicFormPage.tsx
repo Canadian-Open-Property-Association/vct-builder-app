@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Form, FormSchema, FormField, FormSection, unflattenFormData } from '../types/forms';
+import { Form, FormField, FormSection, unflattenFormData } from '../types/forms';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
