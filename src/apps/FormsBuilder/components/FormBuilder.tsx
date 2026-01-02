@@ -526,22 +526,32 @@ export default function FormBuilder() {
   };
 
   // Update info screen
-  const handleUpdateInfoScreen = (title: string, content: string) => {
+  const handleUpdateInfoScreen = (updates: Partial<{ enabled: boolean; title: string; content: string }>) => {
     if (!currentForm) return;
+    // Handle backwards compatibility - infoScreen might be null for old forms
+    const currentInfoScreen = currentForm.schema.infoScreen || { enabled: false, title: '', content: '' };
     const newSchema = {
       ...currentForm.schema,
-      infoScreen: title || content ? { title, content } : null,
+      infoScreen: { ...currentInfoScreen, ...updates },
     };
     updateCurrentFormSchema(newSchema);
     setHasUnsavedChanges(true);
   };
 
   // Update success screen
-  const handleUpdateSuccessScreen = (title: string, content: string) => {
+  const handleUpdateSuccessScreen = (updates: Partial<{ enabled: boolean; title: string; content: string }>) => {
     if (!currentForm) return;
+    // Handle backwards compatibility - ensure successScreen has enabled field
+    const currentSuccessScreen = currentForm.schema.successScreen || { enabled: true, title: '', content: '' };
+    // If enabled field is missing (old schema), add it with default true
+    const successScreenWithEnabled = {
+      enabled: currentSuccessScreen.enabled ?? true,
+      title: currentSuccessScreen.title || '',
+      content: currentSuccessScreen.content || '',
+    };
     const newSchema = {
       ...currentForm.schema,
-      successScreen: { title, content },
+      successScreen: { ...successScreenWithEnabled, ...updates },
     };
     updateCurrentFormSchema(newSchema);
     setHasUnsavedChanges(true);
@@ -1063,92 +1073,127 @@ export default function FormBuilder() {
               {/* Info Screen Tab */}
               {formSettingsTab === 'info' && (
                 <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h3 className="font-semibold text-gray-800">Info Screen (Optional)</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <h3 className="font-semibold text-gray-800">Info Screen</h3>
+                    </div>
+                    {/* Toggle Switch */}
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateInfoScreen({ enabled: !(currentForm.schema.infoScreen?.enabled ?? false) })}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                        currentForm.schema.infoScreen?.enabled ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          currentForm.schema.infoScreen?.enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
                   </div>
                   <p className="text-sm text-gray-500 mb-4">
-                    Shown before the form. Use this to provide instructions or context to respondents.
+                    {currentForm.schema.infoScreen?.enabled
+                      ? 'This screen will be shown before the form.'
+                      : 'Enable to show an info screen before the form.'}
                   </p>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Title
-                      </label>
-                      <input
-                        type="text"
-                        value={currentForm.schema.infoScreen?.title || ''}
-                        onChange={(e) =>
-                          handleUpdateInfoScreen(e.target.value, currentForm.schema.infoScreen?.content || '')
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="e.g., Before You Begin"
-                      />
+                  {currentForm.schema.infoScreen?.enabled && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={currentForm.schema.infoScreen?.title || ''}
+                          onChange={(e) => handleUpdateInfoScreen({ title: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="e.g., Before You Begin"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Content
+                        </label>
+                        <textarea
+                          value={currentForm.schema.infoScreen?.content || ''}
+                          onChange={(e) => handleUpdateInfoScreen({ content: e.target.value })}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[150px]"
+                          placeholder="Instructions or information to display before the form..."
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Markdown is supported</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Content
-                      </label>
-                      <textarea
-                        value={currentForm.schema.infoScreen?.content || ''}
-                        onChange={(e) =>
-                          handleUpdateInfoScreen(currentForm.schema.infoScreen?.title || '', e.target.value)
-                        }
-                        rows={6}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[150px]"
-                        placeholder="Instructions or information to display before the form..."
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Markdown is supported</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 
               {/* Success Screen Tab */}
               {formSettingsTab === 'success' && (
                 <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h3 className="font-semibold text-gray-800">Success Screen</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <h3 className="font-semibold text-gray-800">Success Screen</h3>
+                    </div>
+                    {/* Toggle Switch */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentEnabled = currentForm.schema.successScreen?.enabled ?? true;
+                        handleUpdateSuccessScreen({ enabled: !currentEnabled });
+                      }}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                        (currentForm.schema.successScreen?.enabled ?? true) ? 'bg-green-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          (currentForm.schema.successScreen?.enabled ?? true) ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
                   </div>
                   <p className="text-sm text-gray-500 mb-4">
-                    Shown after successful form submission.
+                    {(currentForm.schema.successScreen?.enabled ?? true)
+                      ? 'This screen will be shown after successful form submission.'
+                      : 'Enable to show a success screen after submission.'}
                   </p>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Title
-                      </label>
-                      <input
-                        type="text"
-                        value={currentForm.schema.successScreen.title}
-                        onChange={(e) =>
-                          handleUpdateSuccessScreen(e.target.value, currentForm.schema.successScreen.content)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="e.g., Thank you!"
-                      />
+                  {(currentForm.schema.successScreen?.enabled ?? true) && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={currentForm.schema.successScreen?.title || ''}
+                          onChange={(e) => handleUpdateSuccessScreen({ title: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="e.g., Thank you!"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Content
+                        </label>
+                        <textarea
+                          value={currentForm.schema.successScreen?.content || ''}
+                          onChange={(e) => handleUpdateSuccessScreen({ content: e.target.value })}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[150px]"
+                          placeholder="Message to display after successful submission..."
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Markdown is supported</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Content
-                      </label>
-                      <textarea
-                        value={currentForm.schema.successScreen.content}
-                        onChange={(e) =>
-                          handleUpdateSuccessScreen(currentForm.schema.successScreen.title, e.target.value)
-                        }
-                        rows={6}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[150px]"
-                        placeholder="Message to display after successful submission..."
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Markdown is supported</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 

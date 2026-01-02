@@ -211,7 +211,7 @@ export default function FormsList() {
               {/* Form header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{form.title}</h3>
+                  <h3 className="font-semibold text-gray-900">{form.title}</h3>
                   {form.description && (
                     <p className="text-sm text-gray-500 line-clamp-2 mt-1">{form.description}</p>
                   )}

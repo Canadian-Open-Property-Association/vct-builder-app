@@ -77,6 +77,7 @@ export interface FormSection {
 
 // Form screen (info/success screens)
 export interface FormScreen {
+  enabled: boolean; // Whether the screen is shown
   title: string;
   content: string; // Markdown content
 }
@@ -84,8 +85,8 @@ export interface FormScreen {
 // Complete form schema (stored in JSONB)
 export interface FormSchema {
   sections: FormSection[];
-  infoScreen: FormScreen | null; // Shown before form
-  successScreen: FormScreen; // Shown after submission
+  infoScreen: FormScreen; // Shown before form (if enabled)
+  successScreen: FormScreen; // Shown after submission (if enabled)
 }
 
 // Form status
@@ -171,8 +172,13 @@ export function createDefaultFormSchema(): FormSchema {
         fields: [],
       },
     ],
-    infoScreen: null,
+    infoScreen: {
+      enabled: false,
+      title: '',
+      content: '',
+    },
     successScreen: {
+      enabled: true,
       title: 'Thank you!',
       content: 'Your form has been submitted successfully.',
     },

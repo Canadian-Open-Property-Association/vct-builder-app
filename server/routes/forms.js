@@ -68,6 +68,66 @@ router.get('/', requireDatabase, async (req, res) => {
 });
 
 /**
+ * POST /api/forms/migrate/field-types
+ * Migrate verified-credential field types to verifiable-credential
+ * This is a one-time migration endpoint
+ * NOTE: Must be defined before /:id routes to avoid path conflict
+ */
+router.post('/migrate/field-types', requireDatabase, async (req, res) => {
+  try {
+    const user = getCurrentUser(req);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Get all forms
+    const forms = await req.db.select().from(schema.forms);
+
+    let migratedCount = 0;
+
+    for (const form of forms) {
+      let updated = false;
+      const updatedSchema = { ...form.schema };
+
+      // Update field types in all sections
+      if (updatedSchema.sections) {
+        for (const section of updatedSchema.sections) {
+          if (section.fields) {
+            for (const field of section.fields) {
+              if (field.type === 'verified-credential') {
+                field.type = 'verifiable-credential';
+                updated = true;
+              }
+            }
+          }
+        }
+      }
+
+      if (updated) {
+        await req.db
+          .update(schema.forms)
+          .set({
+            schema: updatedSchema,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.forms.id, form.id));
+        migratedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Migrated ${migratedCount} form(s) from verified-credential to verifiable-credential`,
+      migratedCount,
+    });
+  } catch (error) {
+    console.error('Error migrating field types:', error);
+    res.status(500).json({ error: 'Failed to migrate field types' });
+  }
+});
+
+/**
  * GET /api/forms/:id
  * Get a single form by ID
  */

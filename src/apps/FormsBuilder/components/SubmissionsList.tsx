@@ -113,24 +113,79 @@ export default function SubmissionsList() {
     }
   };
 
-  const handleExport = async (formId: string) => {
-    try {
-      const response = await fetch(`${API_BASE}/api/submissions/export/${formId}`, {
-        credentials: 'include',
-      });
+  const handleDownloadSingle = (submission: Submission, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click navigation
+    const exportData = {
+      id: submission.id,
+      formId: submission.formId,
+      formTitle: submission.formTitle,
+      submittedAt: submission.submittedAt,
+      isTest: submission.isTest,
+      fieldValues: submission.fieldValues,
+      proofPresentations: submission.proofPresentations,
+    };
 
-      if (!response.ok) throw new Error('Failed to export submissions');
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `submission-${submission.id.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `submissions-${formId}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      alert('Failed to export submissions');
-    }
+  const handleDownloadSelected = () => {
+    if (selectedSubmissions.size === 0) return;
+
+    const selectedData = filteredSubmissions
+      .filter((s) => selectedSubmissions.has(s.id))
+      .map((s) => ({
+        id: s.id,
+        formId: s.formId,
+        formTitle: s.formTitle,
+        submittedAt: s.submittedAt,
+        isTest: s.isTest,
+        fieldValues: s.fieldValues,
+        proofPresentations: s.proofPresentations,
+      }));
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      totalSubmissions: selectedData.length,
+      submissions: selectedData,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `submissions-selected-${selectedData.length}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadAll = () => {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      totalSubmissions: filteredSubmissions.length,
+      submissions: filteredSubmissions.map((s) => ({
+        id: s.id,
+        formId: s.formId,
+        formTitle: s.formTitle,
+        submittedAt: s.submittedAt,
+        isTest: s.isTest,
+        fieldValues: s.fieldValues,
+        proofPresentations: s.proofPresentations,
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `submissions-all-${filteredSubmissions.length}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const formatDate = (dateString: string) => {
@@ -208,16 +263,31 @@ export default function SubmissionsList() {
             </select>
           )}
 
-          {filterFormId !== 'all' && (
-            <button
-              onClick={() => handleExport(filterFormId)}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Export
-            </button>
+          {/* Download buttons */}
+          {filteredSubmissions.length > 0 && (
+            <>
+              {selectedSubmissions.size > 0 ? (
+                <button
+                  onClick={handleDownloadSelected}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download Selected ({selectedSubmissions.size})
+                </button>
+              ) : (
+                <button
+                  onClick={handleDownloadAll}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download All
+                </button>
+              )}
+            </>
           )}
 
           {selectedSubmissions.size > 0 && (
@@ -298,8 +368,12 @@ export default function SubmissionsList() {
                   .join(', ');
 
                 return (
-                  <tr key={submission.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={submission.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/apps/forms-builder/submissions/${submission.id}`)}
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedSubmissions.has(submission.id)}
@@ -327,20 +401,22 @@ export default function SubmissionsList() {
                     <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
                       {previewText || 'No data'}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => navigate(`/apps/forms-builder/submissions/${submission.id}`)}
+                          onClick={(e) => handleDownloadSingle(submission, e)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
-                          title="View details"
+                          title="Download"
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
                         </button>
                         <button
-                          onClick={() => handleDelete(submission.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(submission.id);
+                          }}
                           className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
                           title="Delete"
                         >

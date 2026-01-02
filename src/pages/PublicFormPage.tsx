@@ -253,8 +253,8 @@ export default function PublicFormPage() {
         const formData = await response.json();
         setForm(formData);
 
-        // If form has an info screen, show it first
-        if (formData.schema?.infoScreen) {
+        // If form has an info screen that is enabled, show it first
+        if (formData.schema?.infoScreen?.enabled) {
           setCurrentScreen('info');
         }
       } catch (err) {
@@ -353,7 +353,10 @@ export default function PublicFormPage() {
         throw new Error('Failed to submit form');
       }
 
-      setCurrentScreen('success');
+      // Only show success screen if enabled, otherwise stay on form
+      if (form.schema.successScreen?.enabled ?? true) {
+        setCurrentScreen('success');
+      }
     } catch (err) {
       setErrors({ _form: 'Failed to submit form. Please try again.' });
     } finally {
@@ -398,8 +401,8 @@ export default function PublicFormPage() {
     );
   }
 
-  // Info screen
-  if (currentScreen === 'info' && form.schema.infoScreen) {
+  // Info screen (only shown if enabled)
+  if (currentScreen === 'info' && form.schema.infoScreen?.enabled) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-2xl mx-auto p-6">
@@ -420,8 +423,8 @@ export default function PublicFormPage() {
     );
   }
 
-  // Success screen
-  if (currentScreen === 'success') {
+  // Success screen (only shown if enabled)
+  if (currentScreen === 'success' && (form.schema.successScreen?.enabled ?? true)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
@@ -431,10 +434,10 @@ export default function PublicFormPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {form.schema.successScreen.title}
+            {form.schema.successScreen?.title || 'Thank you!'}
           </h1>
           <p className="text-gray-600 whitespace-pre-wrap">
-            {form.schema.successScreen.content}
+            {form.schema.successScreen?.content || 'Your form has been submitted.'}
           </p>
         </div>
       </div>

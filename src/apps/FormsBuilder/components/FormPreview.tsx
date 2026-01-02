@@ -280,7 +280,10 @@ function CredentialQRPanel({ credentialFields }: { credentialFields: FormField[]
 
 export default function FormPreview({ schema, title, description, onClose }: FormPreviewProps) {
   const [values, setValues] = useState<Record<string, unknown>>({});
-  const [currentPage, setCurrentPage] = useState<'info' | 'form' | 'success'>('form');
+
+  // Determine initial page based on whether info screen is enabled
+  const initialPage = schema.infoScreen?.enabled ? 'info' : 'form';
+  const [currentPage, setCurrentPage] = useState<'info' | 'form' | 'success'>(initialPage);
 
   // Extract all verifiable-credential fields from all sections
   const credentialFields = useMemo(() => {
@@ -295,11 +298,14 @@ export default function FormPreview({ schema, title, description, onClose }: For
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage('success');
+    // Only show success screen if enabled, otherwise just stay on form
+    if (schema.successScreen?.enabled ?? true) {
+      setCurrentPage('success');
+    }
   };
 
-  // Show info screen if it exists
-  if (currentPage === 'info' && schema.infoScreen) {
+  // Show info screen if enabled and we're on info page
+  if (currentPage === 'info' && schema.infoScreen?.enabled) {
     return (
       <div className="flex-1 overflow-y-auto bg-white">
         <div className="max-w-2xl mx-auto p-6">
@@ -318,8 +324,8 @@ export default function FormPreview({ schema, title, description, onClose }: For
     );
   }
 
-  // Show success screen
-  if (currentPage === 'success') {
+  // Show success screen if enabled and we're on success page
+  if (currentPage === 'success' && (schema.successScreen?.enabled ?? true)) {
     return (
       <div className="flex-1 overflow-y-auto bg-white flex items-center justify-center">
         <div className="max-w-md mx-auto p-6 text-center">
@@ -329,9 +335,9 @@ export default function FormPreview({ schema, title, description, onClose }: For
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {schema.successScreen.title}
+            {schema.successScreen?.title || 'Thank you!'}
           </h2>
-          <p className="text-gray-600 mb-6">{schema.successScreen.content}</p>
+          <p className="text-gray-600 mb-6">{schema.successScreen?.content || 'Your form has been submitted.'}</p>
           {onClose && (
             <button
               onClick={onClose}
