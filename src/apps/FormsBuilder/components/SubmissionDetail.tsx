@@ -126,7 +126,7 @@ export default function SubmissionDetail() {
           </svg>
           <h3 className="text-lg font-medium text-red-800 mb-2">{error || 'Submission not found'}</h3>
           <Link
-            to="/apps/proofs-template-builder/submissions"
+            to="/apps/forms-builder/submissions"
             className="inline-flex items-center gap-2 text-red-600 hover:text-red-800"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -144,7 +144,7 @@ export default function SubmissionDetail() {
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link
-          to="/apps/proofs-template-builder/submissions"
+          to="/apps/forms-builder/submissions"
           className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -295,7 +295,7 @@ export default function SubmissionDetail() {
           Copy JSON
         </button>
         <Link
-          to="/apps/proofs-template-builder/submissions"
+          to="/apps/forms-builder/submissions"
           className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
         >
           Back to List

@@ -6,6 +6,7 @@ import PublicFormPage from './pages/PublicFormPage';
 import AuthGuard from './components/Auth/AuthGuard';
 import AdminGuard from './components/Auth/AdminGuard';
 import PlatformShell from './components/Platform/PlatformShell';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import VctBuilderApp from './apps/VctBuilder/VctBuilderApp';
 import SchemaBuilderApp from './apps/SchemaBuilder/SchemaBuilderApp';
 import AdminLogsApp from './apps/AdminLogs/AdminLogsApp';
@@ -13,7 +14,9 @@ import DataDictionaryApp from './apps/DataDictionary/DataDictionaryApp';
 import DataHarmonizationApp from './apps/DataHarmonization/DataHarmonizationApp';
 import EntityManagerApp from './apps/EntityManager/EntityManagerApp';
 import DevToolsApp from './apps/DevTools/DevToolsApp';
+import ProofTemplatesApp from './apps/ProofTemplates/ProofTemplatesApp';
 import FormsBuilderApp from './apps/FormsBuilder/FormsBuilderApp';
+import TestIssuerApp from './apps/TestIssuer/TestIssuerApp';
 import BadgesApp from './apps/Badges/BadgesApp';
 
 // App icons for the platform bar
@@ -65,6 +68,18 @@ const ProofsTemplateBuilderIcon = (
   </svg>
 );
 
+const FormsBuilderIcon = (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const TestIssuerIcon = (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+  </svg>
+);
+
 const BadgesIcon = (
   <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
@@ -97,7 +112,9 @@ function App() {
           element={
             <AuthGuard>
               <PlatformShell appName="VCT Builder" appIcon={VctBuilderIcon}>
-                <VctBuilderApp />
+                <AppErrorBoundary appName="VCT Builder">
+                  <VctBuilderApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }
@@ -108,7 +125,9 @@ function App() {
           element={
             <AuthGuard>
               <PlatformShell appName="Schema Builder" appIcon={SchemaBuilderIcon}>
-                <SchemaBuilderApp />
+                <AppErrorBoundary appName="Schema Builder">
+                  <SchemaBuilderApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }
@@ -120,7 +139,9 @@ function App() {
             <AuthGuard>
               <AdminGuard>
                 <PlatformShell appName="Access Logs" appIcon={AdminLogsIcon}>
-                  <AdminLogsApp />
+                  <AppErrorBoundary appName="Access Logs">
+                    <AdminLogsApp />
+                  </AppErrorBoundary>
                 </PlatformShell>
               </AdminGuard>
             </AuthGuard>
@@ -132,7 +153,9 @@ function App() {
           element={
             <AuthGuard>
               <PlatformShell appName="Data Dictionary" appIcon={DataDictionaryIcon}>
-                <DataDictionaryApp />
+                <AppErrorBoundary appName="Data Dictionary">
+                  <DataDictionaryApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }
@@ -143,7 +166,9 @@ function App() {
           element={
             <AuthGuard>
               <PlatformShell appName="Data Harmonization" appIcon={DataHarmonizationIcon}>
-                <DataHarmonizationApp />
+                <AppErrorBoundary appName="Data Harmonization">
+                  <DataHarmonizationApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }
@@ -154,7 +179,9 @@ function App() {
           element={
             <AuthGuard>
               <PlatformShell appName="Entity Manager" appIcon={EntityManagerIcon}>
-                <EntityManagerApp />
+                <AppErrorBoundary appName="Entity Manager">
+                  <EntityManagerApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }
@@ -165,7 +192,9 @@ function App() {
           element={
             <AuthGuard>
               <PlatformShell appName="Developer Tools" appIcon={DevToolsIcon}>
-                <DevToolsApp />
+                <AppErrorBoundary appName="Developer Tools">
+                  <DevToolsApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }
@@ -175,8 +204,36 @@ function App() {
           path="/apps/proofs-template-builder/*"
           element={
             <AuthGuard>
-              <PlatformShell appName="Proofs Template Builder" appIcon={ProofsTemplateBuilderIcon}>
-                <FormsBuilderApp />
+              <PlatformShell appName="Proof Templates Builder" appIcon={ProofsTemplateBuilderIcon}>
+                <AppErrorBoundary appName="Proof Templates Builder">
+                  <ProofTemplatesApp />
+                </AppErrorBoundary>
+              </PlatformShell>
+            </AuthGuard>
+          }
+        />
+
+        <Route
+          path="/apps/forms-builder/*"
+          element={
+            <AuthGuard>
+              <PlatformShell appName="Forms Builder" appIcon={FormsBuilderIcon}>
+                <AppErrorBoundary appName="Forms Builder">
+                  <FormsBuilderApp />
+                </AppErrorBoundary>
+              </PlatformShell>
+            </AuthGuard>
+          }
+        />
+
+        <Route
+          path="/apps/test-issuer/*"
+          element={
+            <AuthGuard>
+              <PlatformShell appName="Test Issuer" appIcon={TestIssuerIcon}>
+                <AppErrorBoundary appName="Test Issuer">
+                  <TestIssuerApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }
@@ -187,7 +244,9 @@ function App() {
           element={
             <AuthGuard>
               <PlatformShell appName="Badges" appIcon={BadgesIcon}>
-                <BadgesApp />
+                <AppErrorBoundary appName="Badges">
+                  <BadgesApp />
+                </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
           }

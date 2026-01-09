@@ -605,9 +605,9 @@ export default function FormBuilder() {
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/apps/proofs-template-builder')}
+              onClick={() => navigate('/apps/forms-builder')}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Back to proof templates"
+              title="Back to forms"
             >
               <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

@@ -48,7 +48,7 @@ export default function FormsList() {
       setNewFormTitle('');
       setNewFormDescription('');
       // Navigate to editor
-      navigate(`/apps/proofs-template-builder/edit/${form.id}`);
+      navigate(`/apps/forms-builder/edit/${form.id}`);
     } catch (err) {
       // Error is handled in store
     } finally {
@@ -86,7 +86,7 @@ export default function FormsList() {
   const handleClone = async (form: FormListItem) => {
     try {
       const cloned = await cloneForm(form.id);
-      navigate(`/apps/proofs-template-builder/edit/${cloned.id}`);
+      navigate(`/apps/forms-builder/edit/${cloned.id}`);
     } catch (err) {
       // Error is handled in store
     }
@@ -126,8 +126,8 @@ export default function FormsList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ecosystem Proof Templates</h1>
-          <p className="text-gray-600 mt-1">Structure proof templates for storage in the VDR and use by relying parties</p>
+          <h1 className="text-2xl font-bold text-gray-900">Forms Builder</h1>
+          <p className="text-gray-600 mt-1">Build forms with data collection and verifiable credential verification</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -141,7 +141,7 @@ export default function FormsList() {
             </svg>
           </button>
           <button
-            onClick={() => navigate('/apps/proofs-template-builder/submissions')}
+            onClick={() => navigate('/apps/forms-builder/submissions')}
             className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -238,7 +238,7 @@ export default function FormsList() {
               {/* Actions */}
               <div className="flex items-center gap-2 border-t pt-3">
                 <button
-                  onClick={() => navigate(`/apps/proofs-template-builder/edit/${form.id}`)}
+                  onClick={() => navigate(`/apps/forms-builder/edit/${form.id}`)}
                   className="flex-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                 >
                   Edit

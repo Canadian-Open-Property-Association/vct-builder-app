@@ -127,14 +127,38 @@ export const apps: AppCard[] = [
   },
   {
     id: 'proofs-template-builder',
-    name: 'Proofs Template Builder',
-    description: 'Structure proof templates for storage in the VDR and use by relying parties',
+    name: 'Proof Templates Builder',
+    description: 'Create and publish DIF Presentation Exchange proof templates to the VDR',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    ),
+    path: '/apps/proofs-template-builder',
+    available: true,
+  },
+  {
+    id: 'forms-builder',
+    name: 'Forms Builder',
+    description: 'Build forms with data collection and verifiable credential verification',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
-    path: '/apps/proofs-template-builder',
+    path: '/apps/forms-builder',
+    available: true,
+  },
+  {
+    id: 'test-issuer',
+    name: 'Test Issuer',
+    description: 'Issue test credentials via Orbit LOB with QR code scanning',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+      </svg>
+    ),
+    path: '/apps/test-issuer',
     available: true,
   },
 ];

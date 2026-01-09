@@ -233,7 +233,7 @@ export default function SubmissionsList() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <Link
-            to="/apps/proofs-template-builder"
+            to="/apps/forms-builder"
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -320,10 +320,10 @@ export default function SubmissionsList() {
           <h3 className="text-lg font-medium text-gray-900 mb-1">No submissions yet</h3>
           <p className="text-gray-500 mb-4">Submissions will appear here when users fill out your published forms</p>
           <Link
-            to="/apps/proofs-template-builder"
+            to="/apps/forms-builder"
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            View Proof Templates
+            View Forms
           </Link>
         </div>
       )}
@@ -371,7 +371,7 @@ export default function SubmissionsList() {
                   <tr
                     key={submission.id}
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => navigate(`/apps/proofs-template-builder/submissions/${submission.id}`)}
+                    onClick={() => navigate(`/apps/forms-builder/submissions/${submission.id}`)}
                   >
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input

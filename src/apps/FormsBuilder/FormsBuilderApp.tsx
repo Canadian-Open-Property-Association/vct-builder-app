@@ -2,7 +2,9 @@
  * Forms Builder App
  *
  * Main app component for the Forms Builder.
- * Handles internal routing between forms list, form editor, etc.
+ * Build forms with standard fields and credential verification.
+ * Forms can select proof templates from the VDR for VC verification.
+ * Handles internal routing between forms list, form editor, submissions, etc.
  */
 
 import { Routes, Route } from 'react-router-dom';
@@ -13,7 +15,7 @@ import SubmissionsList from './components/SubmissionsList';
 import SubmissionDetail from './components/SubmissionDetail';
 
 export default function FormsBuilderApp() {
-  useAppTracking('proofs-template-builder', 'Proofs Template Builder');
+  useAppTracking('forms-builder', 'Forms Builder');
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
