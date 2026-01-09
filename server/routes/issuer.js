@@ -10,20 +10,13 @@ import express from 'express';
 import crypto from 'crypto';
 import { getDb, schema } from '../db/index.js';
 import { eq, desc } from 'drizzle-orm';
+import {
+  getOrbitConfig,
+  isOrbitConfigured,
+  getOrbitConfigStatus,
+} from '../lib/orbitConfig.js';
 
 const router = express.Router();
-
-// Orbit LOB configuration from environment
-const ORBIT_BASE_URL = process.env.ORBIT_BASE_URL;
-const ORBIT_TENANT_ID = process.env.ORBIT_TENANT_ID;
-const ORBIT_API_KEY = process.env.ORBIT_API_KEY;
-
-/**
- * Check if Orbit is configured
- */
-const isOrbitConfigured = () => {
-  return !!(ORBIT_BASE_URL && ORBIT_TENANT_ID);
-};
 
 /**
  * Get current user from session (COPA GitHub OAuth)
@@ -57,7 +50,7 @@ const requireOrbit = (req, res, next) => {
   if (!isOrbitConfigured()) {
     return res.status(503).json({
       error: 'Orbit LOB not configured',
-      message: 'Please configure ORBIT_BASE_URL and ORBIT_TENANT_ID environment variables.',
+      message: 'Please configure Orbit in Settings or set ORBIT_BASE_URL and ORBIT_TENANT_ID environment variables.',
     });
   }
   next();
@@ -73,10 +66,12 @@ const credentialOffers = new Map();
  * Check Orbit LOB connection status
  */
 router.get('/orbit/status', requireAuth, (req, res) => {
+  const status = getOrbitConfigStatus();
   res.json({
-    baseUrl: ORBIT_BASE_URL || '',
-    tenantId: ORBIT_TENANT_ID || '',
-    connected: isOrbitConfigured(),
+    baseUrl: status.baseUrl,
+    tenantId: status.tenantId,
+    connected: status.configured,
+    source: status.source,
   });
 });
 
@@ -316,7 +311,8 @@ router.post('/offers', requireAuth, requireOrbit, async (req, res) => {
 
     // In a real implementation, this would call the Orbit LOB API
     // For demo, we create a mock offer with a QR code placeholder
-    const offerUrl = `${ORBIT_BASE_URL}/offers/${offerId}`;
+    const orbitConfig = getOrbitConfig();
+    const offerUrl = `${orbitConfig.baseUrl}/offers/${offerId}`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(offerUrl)}`;
 
     const offer = {

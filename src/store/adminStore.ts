@@ -75,6 +75,28 @@ export interface DateRange {
   preset: 'today' | '7d' | '30d' | '90d' | 'custom';
 }
 
+// Orbit Configuration types
+export interface OrbitConfigStatus {
+  configured: boolean;
+  baseUrl: string;
+  tenantId: string;
+  hasApiKey: boolean;
+  source: 'file' | 'environment' | null;
+  configuredAt: string | null;
+  configuredBy: string | null;
+}
+
+export interface OrbitConfigInput {
+  baseUrl: string;
+  tenantId: string;
+  apiKey: string;
+}
+
+export interface OrbitTestResult {
+  success: boolean;
+  message: string;
+}
+
 interface AdminState {
   isAdmin: boolean;
   isAdminLoading: boolean;
@@ -89,7 +111,14 @@ interface AdminState {
   analytics: AnalyticsData | null;
   isAnalyticsLoading: boolean;
   analyticsDateRange: DateRange;
-  activeTab: 'logs' | 'analytics';
+  activeTab: 'logs' | 'analytics' | 'orbit';
+
+  // Orbit Configuration state
+  orbitConfig: OrbitConfigStatus | null;
+  isOrbitConfigLoading: boolean;
+  orbitConfigError: string | null;
+  orbitTestResult: OrbitTestResult | null;
+  isOrbitTesting: boolean;
 
   checkAdminStatus: () => Promise<void>;
   fetchLogs: (filters?: LogFilters, page?: number) => Promise<void>;
@@ -99,7 +128,14 @@ interface AdminState {
   // Analytics actions
   fetchAnalytics: (startDate?: string, endDate?: string) => Promise<void>;
   setAnalyticsDateRange: (range: DateRange) => void;
-  setActiveTab: (tab: 'logs' | 'analytics') => void;
+  setActiveTab: (tab: 'logs' | 'analytics' | 'orbit') => void;
+
+  // Orbit Configuration actions
+  fetchOrbitConfig: () => Promise<void>;
+  updateOrbitConfig: (config: OrbitConfigInput) => Promise<boolean>;
+  testOrbitConnection: (config?: OrbitConfigInput) => Promise<OrbitTestResult>;
+  resetOrbitConfig: () => Promise<void>;
+  clearOrbitTestResult: () => void;
 }
 
 // Helper to get default date range (last 7 days)
@@ -134,6 +170,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   isAnalyticsLoading: false,
   analyticsDateRange: getDefaultDateRange(),
   activeTab: 'logs',
+
+  // Orbit Configuration initial state
+  orbitConfig: null,
+  isOrbitConfigLoading: false,
+  orbitConfigError: null,
+  orbitTestResult: null,
+  isOrbitTesting: false,
 
   checkAdminStatus: async () => {
     // Don't re-check if already checked
@@ -251,7 +294,133 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     get().fetchAnalytics(range.startDate, range.endDate);
   },
 
-  setActiveTab: (tab: 'logs' | 'analytics') => {
+  setActiveTab: (tab: 'logs' | 'analytics' | 'orbit') => {
     set({ activeTab: tab });
+  },
+
+  // Orbit Configuration actions
+  fetchOrbitConfig: async () => {
+    set({ isOrbitConfigLoading: true, orbitConfigError: null });
+
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/orbit-config`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch Orbit configuration');
+      }
+
+      const data = await response.json();
+      set({
+        orbitConfig: data,
+        isOrbitConfigLoading: false,
+      });
+    } catch (error) {
+      set({
+        isOrbitConfigLoading: false,
+        orbitConfigError: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  },
+
+  updateOrbitConfig: async (config: OrbitConfigInput) => {
+    set({ isOrbitConfigLoading: true, orbitConfigError: null });
+
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/orbit-config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(config),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update Orbit configuration');
+      }
+
+      const data = await response.json();
+      set({
+        orbitConfig: {
+          configured: true,
+          baseUrl: data.baseUrl,
+          tenantId: data.tenantId,
+          hasApiKey: data.hasApiKey,
+          source: data.source,
+          configuredAt: data.configuredAt,
+          configuredBy: data.configuredBy,
+        },
+        isOrbitConfigLoading: false,
+      });
+      return true;
+    } catch (error) {
+      set({
+        isOrbitConfigLoading: false,
+        orbitConfigError: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return false;
+    }
+  },
+
+  testOrbitConnection: async (config?: OrbitConfigInput) => {
+    set({ isOrbitTesting: true, orbitTestResult: null });
+
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/orbit-config/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: config ? JSON.stringify(config) : '{}',
+      });
+
+      const data = await response.json();
+      set({
+        isOrbitTesting: false,
+        orbitTestResult: data,
+      });
+      return data;
+    } catch (error) {
+      const result = {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+      set({
+        isOrbitTesting: false,
+        orbitTestResult: result,
+      });
+      return result;
+    }
+  },
+
+  resetOrbitConfig: async () => {
+    set({ isOrbitConfigLoading: true, orbitConfigError: null });
+
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/orbit-config`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reset Orbit configuration');
+      }
+
+      // Refetch to get env var config (if any)
+      await get().fetchOrbitConfig();
+    } catch (error) {
+      set({
+        isOrbitConfigLoading: false,
+        orbitConfigError: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  },
+
+  clearOrbitTestResult: () => {
+    set({ orbitTestResult: null });
   },
 }));

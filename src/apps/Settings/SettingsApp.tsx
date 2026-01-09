@@ -5,10 +5,13 @@ import FilterPanel from './components/FilterPanel';
 import LogsTable from './components/LogsTable';
 import Pagination from './components/Pagination';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import OrbitConfigTab from './components/OrbitConfigTab';
 
-export default function AdminLogsApp() {
+type SettingsTab = 'logs' | 'analytics' | 'orbit';
+
+export default function SettingsApp() {
   // Track app access
-  useAppTracking('admin-logs', 'Admin Access Logs');
+  useAppTracking('settings', 'Settings');
 
   const {
     logs,
@@ -25,15 +28,19 @@ export default function AdminLogsApp() {
     setActiveTab,
   } = useAdminStore();
 
+  // Cast activeTab to allow 'orbit'
+  const currentTab = activeTab as SettingsTab;
+
   const handleRefresh = () => {
-    if (activeTab === 'analytics') {
+    if (currentTab === 'analytics') {
       fetchAnalytics();
-    } else {
+    } else if (currentTab === 'logs') {
       fetchLogs(filters, pagination.page);
     }
+    // Orbit tab handles its own refresh
   };
 
-  const isRefreshing = activeTab === 'analytics' ? isAnalyticsLoading : isLogsLoading;
+  const isRefreshing = currentTab === 'analytics' ? isAnalyticsLoading : isLogsLoading;
 
   // Fetch logs on mount
   useEffect(() => {
@@ -54,7 +61,7 @@ export default function AdminLogsApp() {
               <button
                 onClick={() => setActiveTab('logs')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'logs'
+                  currentTab === 'logs'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
@@ -68,13 +75,13 @@ export default function AdminLogsApp() {
                       d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                     />
                   </svg>
-                  Logs
+                  Access Logs
                 </div>
               </button>
               <button
                 onClick={() => setActiveTab('analytics')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'analytics'
+                  currentTab === 'analytics'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
@@ -91,36 +98,60 @@ export default function AdminLogsApp() {
                   Analytics
                 </div>
               </button>
+              <button
+                onClick={() => setActiveTab('orbit')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  currentTab === 'orbit'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+                    />
+                  </svg>
+                  Orbit Configuration
+                </div>
+              </button>
             </nav>
 
-            {/* Refresh Button */}
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
-              title="Refresh data"
-            >
-              <svg
-                className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {/* Refresh Button - only show for logs/analytics */}
+            {currentTab !== 'orbit' && (
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
+                title="Refresh data"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
+                <svg
+                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'analytics' ? (
+      {currentTab === 'orbit' ? (
+        <OrbitConfigTab />
+      ) : currentTab === 'analytics' ? (
         <AnalyticsDashboard />
       ) : (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

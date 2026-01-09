@@ -22,6 +22,13 @@ import badgesRouter from './routes/badges.js';
 import proofTemplatesRouter from './routes/proof-templates.js';
 import issuerRouter from './routes/issuer.js';
 import { initializeDatabase } from './db/index.js';
+import {
+  getOrbitConfig,
+  getOrbitConfigStatus,
+  saveOrbitConfig,
+  deleteOrbitConfig,
+  testOrbitConnection,
+} from './lib/orbitConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -976,6 +983,93 @@ app.delete('/api/zone-templates/:id', requireProjectAuth, (req, res) => {
 // Check if current user is admin
 app.get('/api/admin/check', requireProjectAuth, (req, res) => {
   res.json({ isAdmin: isAdmin(req) });
+});
+
+// =============================================================================
+// Orbit Configuration (admin only)
+// =============================================================================
+
+// Get Orbit config status (without API key)
+app.get('/api/admin/orbit-config', requireProjectAuth, requireAdmin, (req, res) => {
+  try {
+    const status = getOrbitConfigStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error getting Orbit config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save Orbit config
+app.put('/api/admin/orbit-config', requireProjectAuth, requireAdmin, (req, res) => {
+  try {
+    const { baseUrl, tenantId, apiKey } = req.body;
+
+    if (!baseUrl || !tenantId) {
+      return res.status(400).json({ error: 'Base URL and Tenant ID are required' });
+    }
+
+    const username = req.session?.user?.login || 'unknown';
+    const result = saveOrbitConfig({ baseUrl, tenantId, apiKey }, username);
+
+    // Log the configuration change
+    logAccess(req.session?.user?.id || 'unknown', username, 'orbit_config_update', 'settings');
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error saving Orbit config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test Orbit connection
+app.post('/api/admin/orbit-config/test', requireProjectAuth, requireAdmin, async (req, res) => {
+  try {
+    const { baseUrl, tenantId, apiKey } = req.body;
+
+    // If no config provided in body, use stored config
+    let configToTest;
+    if (baseUrl && tenantId) {
+      configToTest = { baseUrl, tenantId, apiKey };
+    } else {
+      configToTest = getOrbitConfig();
+      if (!configToTest) {
+        return res.status(400).json({
+          success: false,
+          message: 'No Orbit configuration to test',
+        });
+      }
+    }
+
+    const result = await testOrbitConnection(configToTest);
+    res.json(result);
+  } catch (error) {
+    console.error('Error testing Orbit connection:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+// Delete Orbit config (reset to env vars)
+app.delete('/api/admin/orbit-config', requireProjectAuth, requireAdmin, (req, res) => {
+  try {
+    const deleted = deleteOrbitConfig();
+    const username = req.session?.user?.login || 'unknown';
+
+    if (deleted) {
+      logAccess(req.session?.user?.id || 'unknown', username, 'orbit_config_delete', 'settings');
+    }
+
+    res.json({
+      success: true,
+      message: deleted ? 'Configuration reset to environment variables' : 'No file configuration to delete',
+    });
+  } catch (error) {
+    console.error('Error deleting Orbit config:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Get access logs (admin only)

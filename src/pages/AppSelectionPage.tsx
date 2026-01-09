@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../store/adminStore';
-import { apps, AppCard } from '../data/apps';
+import { apps, AppCard, AppCategory, categoryConfig } from '../data/apps';
 
 const RECENT_APPS_KEY = 'copa-apps-recent-apps';
 const MAX_RECENT_APPS = 3;
@@ -24,7 +24,7 @@ function saveRecentApp(appId: string): void {
   try {
     const recent = getRecentApps();
     // Remove if already exists, then add to front
-    const filtered = recent.filter(id => id !== appId);
+    const filtered = recent.filter((id) => id !== appId);
     const updated = [appId, ...filtered].slice(0, MAX_RECENT_APPS);
     localStorage.setItem(RECENT_APPS_KEY, JSON.stringify(updated));
   } catch {
@@ -68,7 +68,11 @@ function AppCardComponent({ app, onNavigate, showRecentBadge }: AppCardComponent
       {showRecentBadge && !app.adminOnly && app.available && (
         <div className="absolute top-3 right-3 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center gap-1">
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+              clipRule="evenodd"
+            />
           </svg>
           Recent
         </div>
@@ -76,23 +80,60 @@ function AppCardComponent({ app, onNavigate, showRecentBadge }: AppCardComponent
 
       <div className="p-4">
         {/* Icon */}
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${
-          app.available
-            ? app.adminOnly
-              ? 'bg-purple-100 text-purple-600'
-              : 'bg-blue-100 text-blue-600'
-            : 'bg-gray-100 text-gray-400'
-        }`}>
+        <div
+          className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${
+            app.available
+              ? app.adminOnly
+                ? 'bg-purple-100 text-purple-600'
+                : 'bg-blue-100 text-blue-600'
+              : 'bg-gray-100 text-gray-400'
+          }`}
+        >
           {app.icon}
         </div>
 
         {/* Content */}
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">
-          {app.name}
-        </h2>
-        <p className="text-gray-600 text-sm">
-          {app.description}
-        </p>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">{app.name}</h2>
+        <p className="text-gray-600 text-sm">{app.description}</p>
+      </div>
+    </div>
+  );
+}
+
+interface CategorySectionProps {
+  category: AppCategory;
+  apps: AppCard[];
+  onNavigate: (app: AppCard) => void;
+}
+
+function CategorySection({ category, apps, onNavigate }: CategorySectionProps) {
+  const config = categoryConfig[category];
+
+  if (apps.length === 0) return null;
+
+  // Sort apps: available first, then alphabetically
+  const sortedApps = [...apps].sort((a, b) => {
+    if (a.available === b.available) {
+      return a.name.localeCompare(b.name);
+    }
+    return a.available ? -1 : 1;
+  });
+
+  return (
+    <div className="mb-10">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">
+          {config.icon}
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">{config.label}</h2>
+          <p className="text-sm text-gray-500">{config.description}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {sortedApps.map((app) => (
+          <AppCardComponent key={app.id} app={app} onNavigate={onNavigate} />
+        ))}
       </div>
     </div>
   );
@@ -110,34 +151,66 @@ export default function AppSelectionPage() {
   }, [checkAdminStatus]);
 
   // Filter apps - only show admin apps if user is admin
-  const visibleApps = apps.filter(app => !app.adminOnly || isAdmin);
+  const visibleApps = useMemo(() => apps.filter((app) => !app.adminOnly || isAdmin), [isAdmin]);
 
   // Filter by search query
-  const searchFilteredApps = searchQuery.trim()
-    ? visibleApps.filter(app =>
-        app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.description.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : visibleApps;
+  const searchFilteredApps = useMemo(
+    () =>
+      searchQuery.trim()
+        ? visibleApps.filter(
+            (app) =>
+              app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              app.description.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        : visibleApps,
+    [visibleApps, searchQuery]
+  );
 
   // Get recent apps (that are still visible/available and match search)
-  const recentApps = searchQuery.trim()
-    ? [] // Hide recent section when searching
-    : recentAppIds
-        .map(id => visibleApps.find(app => app.id === id && app.available))
-        .filter((app): app is AppCard => app !== undefined);
+  const recentApps = useMemo(
+    () =>
+      searchQuery.trim()
+        ? [] // Hide recent section when searching
+        : recentAppIds
+            .map((id) => visibleApps.find((app) => app.id === id && app.available))
+            .filter((app): app is AppCard => app !== undefined),
+    [searchQuery, recentAppIds, visibleApps]
+  );
 
-  // Get other apps (excluding recent ones), sorted with available first
-  const otherApps = (searchQuery.trim() ? searchFilteredApps : visibleApps.filter(app => !recentAppIds.includes(app.id)))
-    .sort((a, b) => {
-      if (a.available === b.available) return 0;
-      return a.available ? -1 : 1;
+  // Group apps by category
+  const appsByCategory = useMemo(() => {
+    const appsToGroup = searchQuery.trim() ? searchFilteredApps : visibleApps;
+    const grouped: Record<AppCategory, AppCard[]> = {
+      governance: [],
+      testing: [],
+      admin: [],
+    };
+
+    appsToGroup.forEach((app) => {
+      // Skip apps that are in recent (when not searching)
+      if (!searchQuery.trim() && recentAppIds.includes(app.id)) return;
+      grouped[app.category].push(app);
     });
 
-  const handleNavigate = useCallback((app: AppCard) => {
-    saveRecentApp(app.id);
-    navigate(app.path);
-  }, [navigate]);
+    return grouped;
+  }, [searchFilteredApps, visibleApps, searchQuery, recentAppIds]);
+
+  // Get sorted categories
+  const sortedCategories = useMemo(
+    () =>
+      (Object.keys(categoryConfig) as AppCategory[]).sort(
+        (a, b) => categoryConfig[a].order - categoryConfig[b].order
+      ),
+    []
+  );
+
+  const handleNavigate = useCallback(
+    (app: AppCard) => {
+      saveRecentApp(app.id);
+      navigate(app.path);
+    },
+    [navigate]
+  );
 
   return (
     <div className="min-h-full bg-gray-50 py-12 px-4">
@@ -145,17 +218,25 @@ export default function AppSelectionPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Welcome to Cornerstone Network Apps</h1>
-          <p className="mt-2 text-gray-600">
-            Select an application to get started
-          </p>
+          <p className="mt-2 text-gray-600">Select an application to get started</p>
         </div>
 
         {/* Search Bar */}
         <div className="mb-8">
           <div className="relative max-w-md mx-auto">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="w-5 h-5 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </div>
             <input
@@ -170,8 +251,18 @@ export default function AppSelectionPage() {
                 onClick={() => setSearchQuery('')}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
@@ -184,21 +275,38 @@ export default function AppSelectionPage() {
             {searchFilteredApps.length === 0 ? (
               <p>No apps found matching "{searchQuery}"</p>
             ) : (
-              <p>Found {searchFilteredApps.length} app{searchFilteredApps.length !== 1 ? 's' : ''} matching "{searchQuery}"</p>
+              <p>
+                Found {searchFilteredApps.length} app
+                {searchFilteredApps.length !== 1 ? 's' : ''} matching "{searchQuery}"
+              </p>
             )}
           </div>
         )}
 
         {/* Recently Used Section */}
         {recentApps.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Recently Used
-              <span className="text-sm font-normal text-gray-500">({recentApps.length})</span>
-            </h2>
+          <div className="mb-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Recently Used</h2>
+                <p className="text-sm text-gray-500">Quick access to your recent apps</p>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {recentApps.map((app) => (
                 <AppCardComponent
@@ -212,27 +320,15 @@ export default function AppSelectionPage() {
           </div>
         )}
 
-        {/* All Apps Section */}
-        <div>
-          {(recentApps.length > 0 || searchQuery.trim()) && (
-            <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              {searchQuery.trim() ? 'Search Results' : (recentApps.length > 0 ? 'Other Apps' : 'All Apps')}
-              <span className="text-sm font-normal text-gray-500">({otherApps.length})</span>
-            </h2>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {otherApps.map((app) => (
-              <AppCardComponent
-                key={app.id}
-                app={app}
-                onNavigate={handleNavigate}
-              />
-            ))}
-          </div>
-        </div>
+        {/* Category Sections */}
+        {sortedCategories.map((category) => (
+          <CategorySection
+            key={category}
+            category={category}
+            apps={appsByCategory[category]}
+            onNavigate={handleNavigate}
+          />
+        ))}
 
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-gray-500">
