@@ -54,8 +54,14 @@ export interface FormField {
   }[];
   // For verifiable-credential fields
   credentialConfig?: {
+    // Source of the credential (VCT Library or Catalogue)
+    source?: 'vct-library' | 'catalogue';
+    // VCT Library fields
     credentialLibraryId?: string;
     schemaId?: string;
+    // Catalogue fields
+    catalogueCredentialId?: string;
+    // Common fields
     credDefId?: string;
     requiredAttributes?: string[];
     // Predicate rule for the proof

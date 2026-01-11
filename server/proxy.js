@@ -21,6 +21,7 @@ import formsBuilderSettingsRouter from './routes/formsBuilderSettings.js';
 import badgesRouter from './routes/badges.js';
 import proofTemplatesRouter from './routes/proof-templates.js';
 import issuerRouter from './routes/issuer.js';
+import credentialCatalogueRouter from './routes/credential-catalogue.js';
 import { initializeDatabase } from './db/index.js';
 import {
   getOrbitConfig,
@@ -187,6 +188,7 @@ app.use('/api/forms-builder/settings', formsBuilderSettingsRouter);
 app.use('/api/badges', badgesRouter);
 app.use('/api/proof-templates', proofTemplatesRouter);
 app.use('/api/issuer', issuerRouter);
+app.use('/api/credential-catalogue', credentialCatalogueRouter);
 
 // Swagger API documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs, {

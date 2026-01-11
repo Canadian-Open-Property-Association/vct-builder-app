@@ -101,12 +101,12 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
       'schema-builder',
       'entity-manager',
       'forms-builder',
-      'proof-templates',
+      'proofs-template-builder',
       'badges',
       'data-dictionary',
       'data-harmonization',
-      'asset-manager',
       'test-issuer',
+      'credential-catalogue',
       'settings',
     ],
   },
@@ -114,6 +114,7 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
 
 /**
  * Available apps that can be enabled/disabled
+ * This list should match apps.tsx with configurable: true
  */
 export const AVAILABLE_APPS = [
   {
@@ -137,7 +138,7 @@ export const AVAILABLE_APPS = [
     description: 'Create forms with VC verification',
   },
   {
-    id: 'proof-templates',
+    id: 'proofs-template-builder',
     name: 'Proof Template Builder',
     description: 'Build proof request templates',
   },
@@ -157,14 +158,24 @@ export const AVAILABLE_APPS = [
     description: 'Map data between standards',
   },
   {
-    id: 'asset-manager',
-    name: 'Asset Manager',
-    description: 'Manage images and assets',
-  },
-  {
     id: 'test-issuer',
     name: 'Test Issuer',
     description: 'Issue test credentials',
+  },
+  {
+    id: 'credential-catalogue',
+    name: 'Credential Catalogue',
+    description: 'Import external credentials for verification',
+  },
+  {
+    id: 'dev-tools',
+    name: 'Developer Tools',
+    description: 'API docs and vocabulary reference',
+  },
+  {
+    id: 'property-access-demo',
+    name: 'Property Access Authorization',
+    description: 'Credential-based property access demo',
   },
 ] as const;
 

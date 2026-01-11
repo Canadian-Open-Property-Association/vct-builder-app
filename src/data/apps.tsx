@@ -16,6 +16,8 @@ export interface AppCard {
   available: boolean;
   adminOnly?: boolean;
   category: AppCategory;
+  /** Whether this app can be enabled/disabled in Settings. False for core apps like Settings. */
+  configurable?: boolean;
 }
 
 export const categoryConfig: Record<
@@ -92,6 +94,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/vct-builder',
     available: true,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -105,6 +108,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/schema-builder',
     available: true,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -118,6 +122,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/property-access-demo',
     available: false,
+    configurable: true,
     category: 'testing',
   },
   {
@@ -131,6 +136,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/data-dictionary',
     available: true,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -144,6 +150,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/entity-manager',
     available: true,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -157,6 +164,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/data-harmonization',
     available: true,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -170,6 +178,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/badges',
     available: true,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -185,6 +194,7 @@ export const apps: AppCard[] = [
     path: '/apps/settings',
     available: true,
     adminOnly: true,
+    configurable: false,
     category: 'admin',
   },
   {
@@ -198,6 +208,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/dev-tools',
     available: false,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -211,6 +222,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/proofs-template-builder',
     available: true,
+    configurable: true,
     category: 'governance',
   },
   {
@@ -224,6 +236,7 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/forms-builder',
     available: true,
+    configurable: true,
     category: 'testing',
   },
   {
@@ -237,6 +250,21 @@ export const apps: AppCard[] = [
     ),
     path: '/apps/test-issuer',
     available: true,
+    configurable: true,
+    category: 'testing',
+  },
+  {
+    id: 'credential-catalogue',
+    name: 'Credential Catalogue',
+    description: 'Import and manage external AnonCreds credentials for verification testing',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+    path: '/apps/credential-catalogue',
+    available: true,
+    configurable: true,
     category: 'testing',
   },
 ];

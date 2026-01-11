@@ -2,7 +2,9 @@
  * CredentialFieldConfig Component
  *
  * Configuration panel for Verifiable Credential fields.
- * Allows selecting a credential from the VCT library and choosing attributes to verify.
+ * Allows selecting a credential from either:
+ * - VCT Library (SD-JWT VC credentials)
+ * - Credential Catalogue (imported AnonCreds for verification)
  */
 
 import { useState, useEffect } from 'react';
@@ -16,8 +18,12 @@ import {
   parseJsonSchema,
   flattenSchemaProperties,
 } from '../../../types/vct';
+import type { CatalogueCredential } from '../../../types/catalogue';
+import { PREDEFINED_ECOSYSTEM_TAGS } from '../../../types/catalogue';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
+
+type CredentialSource = 'vct-library' | 'catalogue';
 
 interface VctFile {
   name: string;
@@ -45,25 +51,55 @@ interface CredentialFieldConfigProps {
 }
 
 export default function CredentialFieldConfig({ field, onUpdate }: CredentialFieldConfigProps) {
+  // Source selection
+  const [source, setSource] = useState<CredentialSource>(
+    field.credentialConfig?.source || 'vct-library'
+  );
+
+  // VCT Library state
   const [vctLibrary, setVctLibrary] = useState<VctFile[]>([]);
   const [selectedVct, setSelectedVct] = useState<VctContent | null>(null);
   const [schemaProperties, setSchemaProperties] = useState<ParsedSchemaProperty[]>([]);
+
+  // Catalogue state
+  const [catalogueCredentials, setCatalogueCredentials] = useState<CatalogueCredential[]>([]);
+  const [selectedCatalogueCredential, setSelectedCatalogueCredential] = useState<CatalogueCredential | null>(null);
+
+  // Loading states
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [isLoadingVct, setIsLoadingVct] = useState(false);
   const [isLoadingSchema, setIsLoadingSchema] = useState(false);
+  const [isLoadingCatalogue, setIsLoadingCatalogue] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch VCT library on mount
+  // Fetch data on mount based on source
   useEffect(() => {
-    fetchVctLibrary();
-  }, []);
+    if (source === 'vct-library') {
+      fetchVctLibrary();
+    } else {
+      fetchCatalogueCredentials();
+    }
+  }, [source]);
 
   // If field already has a credential configured, load it
   useEffect(() => {
-    if (field.credentialConfig?.credentialLibraryId && !selectedVct) {
+    if (field.credentialConfig?.source === 'catalogue' && field.credentialConfig?.catalogueCredentialId) {
+      // Will be loaded when catalogue credentials are fetched
+      setSource('catalogue');
+    } else if (field.credentialConfig?.credentialLibraryId && !selectedVct) {
       loadVctByFilename(field.credentialConfig.credentialLibraryId);
     }
-  }, [field.credentialConfig?.credentialLibraryId]);
+  }, [field.credentialConfig?.credentialLibraryId, field.credentialConfig?.catalogueCredentialId]);
+
+  // Load selected catalogue credential when credentials are fetched
+  useEffect(() => {
+    if (source === 'catalogue' && field.credentialConfig?.catalogueCredentialId && catalogueCredentials.length > 0) {
+      const credential = catalogueCredentials.find(c => c.id === field.credentialConfig?.catalogueCredentialId);
+      if (credential) {
+        setSelectedCatalogueCredential(credential);
+      }
+    }
+  }, [catalogueCredentials, field.credentialConfig?.catalogueCredentialId, source]);
 
   const fetchVctLibrary = async () => {
     setIsLoadingLibrary(true);
@@ -84,6 +120,28 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
       setError(err instanceof Error ? err.message : 'Failed to load credential library');
     } finally {
       setIsLoadingLibrary(false);
+    }
+  };
+
+  const fetchCatalogueCredentials = async () => {
+    setIsLoadingCatalogue(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/credential-catalogue`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch credential catalogue');
+      }
+
+      const data = await response.json();
+      setCatalogueCredentials(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load credential catalogue');
+    } finally {
+      setIsLoadingCatalogue(false);
     }
   };
 
@@ -136,6 +194,24 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
     }
   };
 
+  const handleSourceChange = (newSource: CredentialSource) => {
+    setSource(newSource);
+    // Clear selections when source changes
+    setSelectedVct(null);
+    setSelectedCatalogueCredential(null);
+    setSchemaProperties([]);
+    onUpdate({
+      credentialConfig: {
+        source: newSource,
+        credentialLibraryId: undefined,
+        catalogueCredentialId: undefined,
+        credDefId: undefined,
+        attributePath: undefined,
+        predicate: undefined,
+      },
+    });
+  };
+
   const handleCredentialSelect = async (filename: string) => {
     if (!filename) {
       setSelectedVct(null);
@@ -143,6 +219,7 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
       onUpdate({
         credentialConfig: {
           ...field.credentialConfig,
+          source: 'vct-library',
           credentialLibraryId: undefined,
           schemaId: undefined,
           attributePath: undefined,
@@ -156,9 +233,39 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
     onUpdate({
       credentialConfig: {
         ...field.credentialConfig,
+        source: 'vct-library',
         credentialLibraryId: filename,
       },
     });
+  };
+
+  const handleCatalogueCredentialSelect = (credentialId: string) => {
+    if (!credentialId) {
+      setSelectedCatalogueCredential(null);
+      onUpdate({
+        credentialConfig: {
+          ...field.credentialConfig,
+          source: 'catalogue',
+          catalogueCredentialId: undefined,
+          credDefId: undefined,
+          attributePath: undefined,
+        },
+      });
+      return;
+    }
+
+    const credential = catalogueCredentials.find(c => c.id === credentialId);
+    if (credential) {
+      setSelectedCatalogueCredential(credential);
+      onUpdate({
+        credentialConfig: {
+          ...field.credentialConfig,
+          source: 'catalogue',
+          catalogueCredentialId: credentialId,
+          credDefId: credential.credDefId,
+        },
+      });
+    }
   };
 
   const handleAttributeSelect = (attributePath: string) => {
@@ -189,6 +296,19 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
     return vct.name || vct.vct || 'Unknown Credential';
   };
 
+  // Helper to get ecosystem tag name
+  const getEcosystemTagName = (tagId: string) => {
+    return PREDEFINED_ECOSYSTEM_TAGS.find(t => t.id === tagId)?.name || tagId;
+  };
+
+  // Group catalogue credentials by ecosystem
+  const groupedCatalogueCredentials = catalogueCredentials.reduce((acc, cred) => {
+    const tag = cred.ecosystemTag || 'other';
+    if (!acc[tag]) acc[tag] = [];
+    acc[tag].push(cred);
+    return acc;
+  }, {} as Record<string, CatalogueCredential[]>);
+
   return (
     <div className="border-t pt-4">
       <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
@@ -204,39 +324,113 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
         </div>
       )}
 
-      {/* Credential Selection */}
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Select Credential Type
+      {/* Source Selection */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Credential Source
         </label>
-        {isLoadingLibrary ? (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
-            Loading credentials...
-          </div>
-        ) : (
-          <select
-            value={field.credentialConfig?.credentialLibraryId || ''}
-            onChange={(e) => handleCredentialSelect(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => handleSourceChange('vct-library')}
+            className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
+              source === 'vct-library'
+                ? 'bg-blue-50 border-blue-300 text-blue-700'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
           >
-            <option value="">-- Select a credential --</option>
-            {vctLibrary.map((vct) => (
-              <option key={vct.name} value={vct.name}>
-                {vct.name.replace('.json', '')}
-              </option>
-            ))}
-          </select>
-        )}
-        {vctLibrary.length === 0 && !isLoadingLibrary && (
-          <p className="text-xs text-gray-500 mt-1">
-            No credentials found in the library. Make sure you have access to the VCT repository.
-          </p>
-        )}
+            <div className="font-medium">VCT Library</div>
+            <div className="text-xs opacity-75">SD-JWT VC credentials</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSourceChange('catalogue')}
+            className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
+              source === 'catalogue'
+                ? 'bg-purple-50 border-purple-300 text-purple-700'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <div className="font-medium">Credential Catalogue</div>
+            <div className="text-xs opacity-75">Imported AnonCreds</div>
+          </button>
+        </div>
       </div>
 
-      {/* Selected Credential Info */}
-      {selectedVct && (
+      {/* VCT Library Selection */}
+      {source === 'vct-library' && (
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Select Credential Type
+          </label>
+          {isLoadingLibrary ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+              Loading credentials...
+            </div>
+          ) : (
+            <select
+              value={field.credentialConfig?.credentialLibraryId || ''}
+              onChange={(e) => handleCredentialSelect(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">-- Select a credential --</option>
+              {vctLibrary.map((vct) => (
+                <option key={vct.name} value={vct.name}>
+                  {vct.name.replace('.json', '')}
+                </option>
+              ))}
+            </select>
+          )}
+          {vctLibrary.length === 0 && !isLoadingLibrary && (
+            <p className="text-xs text-gray-500 mt-1">
+              No credentials found in the library. Make sure you have access to the VCT repository.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Catalogue Selection */}
+      {source === 'catalogue' && (
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Select Credential
+          </label>
+          {isLoadingCatalogue ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-500 border-t-transparent"></div>
+              Loading catalogue...
+            </div>
+          ) : catalogueCredentials.length > 0 ? (
+            <select
+              value={field.credentialConfig?.catalogueCredentialId || ''}
+              onChange={(e) => handleCatalogueCredentialSelect(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            >
+              <option value="">-- Select a credential --</option>
+              {Object.entries(groupedCatalogueCredentials).map(([tagId, credentials]) => (
+                <optgroup key={tagId} label={getEcosystemTagName(tagId)}>
+                  {credentials.map((cred) => (
+                    <option key={cred.id} value={cred.id}>
+                      {cred.name} v{cred.version}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          ) : (
+            <div className="p-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500">
+              <p>No credentials in the catalogue yet.</p>
+              <p className="text-xs mt-1">
+                Import credentials from external ecosystems using the Credential Catalogue app.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selected VCT Credential Info */}
+      {source === 'vct-library' && selectedVct && (
         <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start gap-2">
             <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -254,8 +448,37 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
         </div>
       )}
 
-      {/* Attribute Selection */}
-      {selectedVct && (
+      {/* Selected Catalogue Credential Info */}
+      {source === 'catalogue' && selectedCatalogueCredential && (
+        <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-purple-900">
+                {selectedCatalogueCredential.name} v{selectedCatalogueCredential.version}
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                  {getEcosystemTagName(selectedCatalogueCredential.ecosystemTag)}
+                </span>
+                <span className="text-xs text-purple-600">
+                  {selectedCatalogueCredential.attributes.length} attributes
+                </span>
+              </div>
+              {selectedCatalogueCredential.issuerName && (
+                <p className="text-xs text-purple-600 mt-1">
+                  Issuer: {selectedCatalogueCredential.issuerName}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VCT Attribute Selection */}
+      {source === 'vct-library' && selectedVct && (
         <div className="mb-3">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Attribute to Verify
@@ -321,8 +544,32 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
         </div>
       )}
 
+      {/* Catalogue Attribute Selection */}
+      {source === 'catalogue' && selectedCatalogueCredential && (
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Attribute to Verify
+          </label>
+          <select
+            value={field.credentialConfig?.attributePath || ''}
+            onChange={(e) => handleAttributeSelect(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+          >
+            <option value="">-- Select an attribute --</option>
+            {selectedCatalogueCredential.attributes.map((attr) => (
+              <option key={attr} value={attr}>
+                {attr}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            The AnonCreds attribute that will be verified
+          </p>
+        </div>
+      )}
+
       {/* Predicate Configuration */}
-      {selectedVct && field.credentialConfig?.attributePath && (
+      {((source === 'vct-library' && selectedVct) || (source === 'catalogue' && selectedCatalogueCredential)) && field.credentialConfig?.attributePath && (
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2">
             <input
@@ -412,13 +659,23 @@ export default function CredentialFieldConfig({ field, onUpdate }: CredentialFie
       )}
 
 
-      {/* No credential selected state */}
-      {!selectedVct && !isLoadingLibrary && !isLoadingVct && (
+      {/* No credential selected state - VCT Library */}
+      {source === 'vct-library' && !selectedVct && !isLoadingLibrary && !isLoadingVct && (
         <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-center text-sm text-gray-500">
           <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
-          <p>Select a credential type from the library to configure verification</p>
+          <p>Select a credential type from the VCT library to configure verification</p>
+        </div>
+      )}
+
+      {/* No credential selected state - Catalogue */}
+      {source === 'catalogue' && !selectedCatalogueCredential && !isLoadingCatalogue && catalogueCredentials.length > 0 && (
+        <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-center text-sm text-gray-500">
+          <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <p>Select a credential from the catalogue to configure verification</p>
         </div>
       )}
     </div>

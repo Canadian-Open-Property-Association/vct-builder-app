@@ -5,7 +5,7 @@
  * for quick navigation between apps.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getAvailableApps } from '../../data/apps';
 import { useAdminStore } from '../../store/adminStore';
@@ -13,11 +13,26 @@ import { useAdminStore } from '../../store/adminStore';
 export default function AppSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin } = useAdminStore();
+  const { isAdmin, tenantConfig } = useAdminStore();
   const [isOpen, setIsOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
-  const availableApps = getAvailableApps(isAdmin);
+  // Get enabled apps from tenant config
+  const enabledAppIds = useMemo(
+    () => new Set(tenantConfig?.apps?.enabledApps || []),
+    [tenantConfig?.apps?.enabledApps]
+  );
+
+  // Filter apps by admin status and tenant config
+  const availableApps = useMemo(() => {
+    const apps = getAvailableApps(isAdmin);
+    return apps.filter((app) => {
+      // Non-configurable apps (like Settings) are always shown
+      if (app.configurable === false) return true;
+      // Configurable apps must be in enabled list
+      return enabledAppIds.has(app.id);
+    });
+  }, [isAdmin, enabledAppIds]);
 
   // Close popup when clicking outside
   useEffect(() => {

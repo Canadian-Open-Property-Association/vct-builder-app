@@ -109,8 +109,34 @@ export default function AppSelectionPage() {
   const ecosystemName = tenantConfig?.ecosystem?.name || 'Cornerstone Network';
   const ecosystemTagline = tenantConfig?.ecosystem?.tagline || 'A digital trust toolkit for the Cornerstone Network ecosystem';
 
-  // Filter apps - only show admin apps if user is admin
-  const visibleApps = useMemo(() => apps.filter((app) => !app.adminOnly || isAdmin), [isAdmin]);
+  // Get enabled apps from tenant config
+  const enabledAppIds = useMemo(
+    () => new Set(tenantConfig?.apps?.enabledApps || []),
+    [tenantConfig?.apps?.enabledApps]
+  );
+
+  // Filter apps based on:
+  // 1. Admin-only apps: only show if user is admin
+  // 2. Configurable apps: only show if enabled in tenant config (or if not available - show as "Coming Soon")
+  // 3. Non-configurable apps (like Settings): always show
+  const visibleApps = useMemo(
+    () =>
+      apps.filter((app) => {
+        // Hide admin-only apps from non-admins
+        if (app.adminOnly && !isAdmin) return false;
+
+        // Non-configurable apps (like Settings) are always shown
+        if (app.configurable === false) return true;
+
+        // For configurable apps, check if enabled OR if unavailable (show as "Coming Soon")
+        // This allows unavailable apps to still appear with "Coming Soon" badge
+        if (!app.available) return true;
+
+        // Check if app is enabled in tenant config
+        return enabledAppIds.has(app.id);
+      }),
+    [isAdmin, enabledAppIds]
+  );
 
   // Filter by search query
   const searchFilteredApps = useMemo(
