@@ -34,6 +34,7 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "swagger-ui-react": "^5.30.3",
+    "uuid": "^9.0.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
