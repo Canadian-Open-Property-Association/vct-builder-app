@@ -25,9 +25,11 @@ import { initializeDatabase } from './db/index.js';
 import {
   getOrbitConfig,
   getOrbitConfigStatus,
+  getOrbitApiConfig,
   saveOrbitConfig,
   saveOrbitCredentials,
   saveApiConfig,
+  saveApiSettings,
   deleteOrbitConfig,
   testOrbitConnection,
   testApiConnection,
@@ -1028,18 +1030,18 @@ app.put('/api/admin/orbit-credentials', requireProjectAuth, requireAdmin, (req, 
   }
 });
 
-// Save a single API's Base URL
+// Save a single API's Base URL and optional settings
 app.put('/api/admin/orbit-api/:apiType', requireProjectAuth, requireAdmin, (req, res) => {
   try {
     const { apiType } = req.params;
-    const { baseUrl } = req.body;
+    const { baseUrl, settings } = req.body;
 
     if (!VALID_ORBIT_API_TYPES.includes(apiType)) {
       return res.status(400).json({ error: `Invalid API type: ${apiType}` });
     }
 
     const username = req.session?.user?.login || 'unknown';
-    const result = saveApiConfig(apiType, baseUrl || '', username);
+    const result = saveApiConfig(apiType, baseUrl || '', settings || null, username);
 
     // Log the configuration change
     logAccess(req.session?.user?.id || 'unknown', username, `orbit_api_${apiType}_update`, 'settings');
@@ -1047,6 +1049,33 @@ app.put('/api/admin/orbit-api/:apiType', requireProjectAuth, requireAdmin, (req,
     res.json(result);
   } catch (error) {
     console.error('Error saving Orbit API config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save only settings for a specific API (preserves baseUrl)
+app.put('/api/admin/orbit-api/:apiType/settings', requireProjectAuth, requireAdmin, (req, res) => {
+  try {
+    const { apiType } = req.params;
+    const { settings } = req.body;
+
+    if (!VALID_ORBIT_API_TYPES.includes(apiType)) {
+      return res.status(400).json({ error: `Invalid API type: ${apiType}` });
+    }
+
+    if (!settings || typeof settings !== 'object') {
+      return res.status(400).json({ error: 'settings object is required' });
+    }
+
+    const username = req.session?.user?.login || 'unknown';
+    const result = saveApiSettings(apiType, settings, username);
+
+    // Log the configuration change
+    logAccess(req.session?.user?.id || 'unknown', username, `orbit_api_${apiType}_settings_update`, 'settings');
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error saving Orbit API settings:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1144,6 +1173,123 @@ app.delete('/api/admin/orbit-config', requireProjectAuth, requireAdmin, (req, re
     });
   } catch (error) {
     console.error('Error deleting Orbit config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =============================================================================
+// Orbit Config Service (for apps to consume)
+// =============================================================================
+
+/**
+ * Get configuration for a specific Orbit API
+ * Used by apps (FormsBuilder, TestIssuer, etc.) to get API credentials and settings
+ *
+ * Returns: { baseUrl, lobId, apiKey, settings }
+ * Returns 503 if the API is not configured
+ */
+app.get('/api/orbit/config/:apiType', requireProjectAuth, (req, res) => {
+  try {
+    const { apiType } = req.params;
+
+    if (!VALID_ORBIT_API_TYPES.includes(apiType)) {
+      return res.status(400).json({
+        error: `Invalid API type: ${apiType}`,
+        message: `Valid types are: ${VALID_ORBIT_API_TYPES.join(', ')}`,
+      });
+    }
+
+    const config = getOrbitApiConfig(apiType);
+
+    if (!config?.baseUrl) {
+      // Get the API label for a better error message
+      const apiLabels = {
+        lob: 'LOB',
+        registerSocket: 'Register Socket',
+        connection: 'Connection',
+        holder: 'Holder',
+        verifier: 'Verifier',
+        issuer: 'Issuer',
+        chat: 'Chat',
+      };
+      const label = apiLabels[apiType] || apiType;
+
+      return res.status(503).json({
+        error: `${label} API not configured`,
+        message: `Configure the ${label} API Base URL in Settings.`,
+        apiType,
+      });
+    }
+
+    res.json({
+      baseUrl: config.baseUrl,
+      lobId: config.lobId,
+      apiKey: config.apiKey,
+      settings: config.settings || {},
+    });
+  } catch (error) {
+    console.error('Error getting Orbit API config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Get configuration for multiple Orbit APIs at once
+ * Useful for apps that need several APIs (e.g., FormsBuilder needs verifier, credential, registerSocket)
+ *
+ * Query param: apis=verifier,credential,registerSocket (comma-separated)
+ * Returns: { verifier: {...}, credential: {...}, ... }
+ * Returns 503 with missing array if any required API is not configured
+ */
+app.get('/api/orbit/config', requireProjectAuth, (req, res) => {
+  try {
+    const { apis } = req.query;
+
+    if (!apis) {
+      return res.status(400).json({
+        error: 'Missing apis parameter',
+        message: 'Specify which APIs you need: ?apis=verifier,issuer',
+      });
+    }
+
+    const requestedApis = apis.split(',').map(a => a.trim());
+    const invalidApis = requestedApis.filter(a => !VALID_ORBIT_API_TYPES.includes(a));
+
+    if (invalidApis.length > 0) {
+      return res.status(400).json({
+        error: `Invalid API types: ${invalidApis.join(', ')}`,
+        message: `Valid types are: ${VALID_ORBIT_API_TYPES.join(', ')}`,
+      });
+    }
+
+    const configs = {};
+    const missing = [];
+
+    for (const apiType of requestedApis) {
+      const config = getOrbitApiConfig(apiType);
+      if (!config?.baseUrl) {
+        missing.push(apiType);
+      } else {
+        configs[apiType] = {
+          baseUrl: config.baseUrl,
+          lobId: config.lobId,
+          apiKey: config.apiKey,
+          settings: config.settings || {},
+        };
+      }
+    }
+
+    if (missing.length > 0) {
+      return res.status(503).json({
+        error: 'APIs not configured',
+        missing,
+        message: `Configure these APIs in Settings: ${missing.join(', ')}`,
+      });
+    }
+
+    res.json(configs);
+  } catch (error) {
+    console.error('Error getting Orbit API configs:', error);
     res.status(500).json({ error: error.message });
   }
 });

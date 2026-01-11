@@ -82,29 +82,46 @@ function decrypt(encrypted) {
 }
 
 /**
+ * Default settings for each API type
+ * Only verifier has settings for MVP
+ */
+const DEFAULT_API_SETTINGS = {
+  verifier: { autoVerify: true },
+  issuer: {},
+  lob: {},
+  registerSocket: {},
+  connection: {},
+  holder: {},
+  chat: {},
+};
+
+/**
  * Get empty APIs config structure
  */
 function getEmptyApisConfig() {
   return {
-    lob: { baseUrl: '' },
-    registerSocket: { baseUrl: '' },
-    connection: { baseUrl: '' },
-    holder: { baseUrl: '' },
-    verifier: { baseUrl: '' },
-    issuer: { baseUrl: '' },
-    chat: { baseUrl: '' },
+    lob: { baseUrl: '', settings: {} },
+    registerSocket: { baseUrl: '', settings: {} },
+    connection: { baseUrl: '', settings: {} },
+    holder: { baseUrl: '', settings: {} },
+    verifier: { baseUrl: '', settings: {} },
+    issuer: { baseUrl: '', settings: {} },
+    chat: { baseUrl: '', settings: {} },
   };
 }
 
 /**
  * Migrate old config format to new multi-API format
  * Old: { baseUrl, tenantId, apiKeyEncrypted }
- * New: { lobId, apiKeyEncrypted, apis: { lob: { baseUrl }, ... } }
+ * New: { lobId, apiKeyEncrypted, apis: { lob: { baseUrl, settings }, ... } }
  */
 function migrateConfig(oldConfig) {
+  let needsMigration = false;
+
   // Check if migration is needed (old format has tenantId or baseUrl at root level)
   if (oldConfig.tenantId !== undefined || (oldConfig.baseUrl !== undefined && !oldConfig.apis)) {
     console.log('Migrating Orbit config from old format to new multi-API format');
+    needsMigration = true;
 
     const migrated = {
       lobId: oldConfig.tenantId || oldConfig.lobId || '',
@@ -120,6 +137,33 @@ function migrateConfig(oldConfig) {
     }
 
     return migrated;
+  }
+
+  // Check if settings migration is needed (apis exist but without settings)
+  if (oldConfig.apis) {
+    for (const apiType of VALID_API_TYPES) {
+      const api = oldConfig.apis[apiType];
+      if (api && api.settings === undefined) {
+        needsMigration = true;
+        break;
+      }
+    }
+
+    if (needsMigration) {
+      console.log('Migrating Orbit config to add per-API settings');
+      const migrated = { ...oldConfig };
+      for (const apiType of VALID_API_TYPES) {
+        if (migrated.apis[apiType]) {
+          migrated.apis[apiType] = {
+            baseUrl: migrated.apis[apiType].baseUrl || '',
+            settings: migrated.apis[apiType].settings || {},
+          };
+        } else {
+          migrated.apis[apiType] = { baseUrl: '', settings: {} };
+        }
+      }
+      return migrated;
+    }
   }
 
   // Already in new format
@@ -228,7 +272,7 @@ export function getOrbitConfig() {
  * Used by consumer apps (e.g., Test Issuer uses 'issuer' API)
  *
  * @param {string} apiType - One of: lob, registerSocket, connection, holder, verifier, issuer, chat
- * @returns {Object|null} Config with baseUrl, lobId, apiKey or null if not configured
+ * @returns {Object|null} Config with baseUrl, lobId, apiKey, settings or null if not configured
  */
 export function getOrbitApiConfig(apiType) {
   if (!VALID_API_TYPES.includes(apiType)) {
@@ -242,10 +286,15 @@ export function getOrbitApiConfig(apiType) {
   const apiConfig = config.apis?.[apiType];
   if (!apiConfig?.baseUrl) return null;
 
+  // Merge default settings with saved settings
+  const defaultSettings = DEFAULT_API_SETTINGS[apiType] || {};
+  const savedSettings = apiConfig.settings || {};
+
   return {
     baseUrl: apiConfig.baseUrl,
     lobId: config.lobId,
     apiKey: config.apiKey || '',
+    settings: { ...defaultSettings, ...savedSettings },
   };
 }
 
@@ -295,14 +344,15 @@ export function saveOrbitCredentials(lobId, apiKey, configuredBy = 'unknown') {
 }
 
 /**
- * Save a single API's Base URL
+ * Save a single API's Base URL and optional settings
  *
  * @param {string} apiType - One of: lob, registerSocket, connection, holder, verifier, issuer, chat
  * @param {string} baseUrl - The Base URL for this API
+ * @param {Object} settings - Optional settings object for this API
  * @param {string} configuredBy - Username of who made the change
  * @returns {Object} Updated config status
  */
-export function saveApiConfig(apiType, baseUrl, configuredBy = 'unknown') {
+export function saveApiConfig(apiType, baseUrl, settings = null, configuredBy = 'unknown') {
   if (!VALID_API_TYPES.includes(apiType)) {
     throw new Error(`Invalid API type: ${apiType}`);
   }
@@ -321,9 +371,14 @@ export function saveApiConfig(apiType, baseUrl, configuredBy = 'unknown') {
     apis: getEmptyApisConfig(),
   };
 
-  // Update the specific API's baseUrl
+  // Update the specific API's baseUrl and settings
   const apis = existing.apis || getEmptyApisConfig();
-  apis[apiType] = { baseUrl: baseUrl || '' };
+  const existingApiConfig = apis[apiType] || { baseUrl: '', settings: {} };
+
+  apis[apiType] = {
+    baseUrl: baseUrl || '',
+    settings: settings !== null ? settings : (existingApiConfig.settings || {}),
+  };
 
   const dataToSave = {
     lobId: existing.lobId || '',
@@ -341,6 +396,62 @@ export function saveApiConfig(apiType, baseUrl, configuredBy = 'unknown') {
   fs.writeFileSync(filePath, JSON.stringify(dataToSave, null, 2));
 
   console.log(`Orbit ${apiType} API config saved by ${configuredBy}`);
+
+  return getOrbitConfigStatus();
+}
+
+/**
+ * Save only the settings for a specific API (preserves baseUrl)
+ *
+ * @param {string} apiType - One of: lob, registerSocket, connection, holder, verifier, issuer, chat
+ * @param {Object} settings - Settings object for this API
+ * @param {string} configuredBy - Username of who made the change
+ * @returns {Object} Updated config status
+ */
+export function saveApiSettings(apiType, settings, configuredBy = 'unknown') {
+  if (!VALID_API_TYPES.includes(apiType)) {
+    throw new Error(`Invalid API type: ${apiType}`);
+  }
+
+  const assetsPath = getAssetsPath();
+
+  // Ensure assets directory exists
+  if (!fs.existsSync(assetsPath)) {
+    fs.mkdirSync(assetsPath, { recursive: true });
+  }
+
+  // Read existing config or create new
+  const existing = readFileConfig() || {
+    lobId: '',
+    apiKeyEncrypted: null,
+    apis: getEmptyApisConfig(),
+  };
+
+  // Update only the settings, preserve baseUrl
+  const apis = existing.apis || getEmptyApisConfig();
+  const existingApiConfig = apis[apiType] || { baseUrl: '', settings: {} };
+
+  apis[apiType] = {
+    baseUrl: existingApiConfig.baseUrl || '',
+    settings: settings || {},
+  };
+
+  const dataToSave = {
+    lobId: existing.lobId || '',
+    apis,
+    configuredAt: new Date().toISOString(),
+    configuredBy,
+  };
+
+  // Keep existing encrypted API key
+  if (existing.apiKeyEncrypted) {
+    dataToSave.apiKeyEncrypted = existing.apiKeyEncrypted;
+  }
+
+  const filePath = getSettingsFilePath();
+  fs.writeFileSync(filePath, JSON.stringify(dataToSave, null, 2));
+
+  console.log(`Orbit ${apiType} API settings saved by ${configuredBy}`);
 
   return getOrbitConfigStatus();
 }
@@ -515,7 +626,7 @@ export function saveOrbitConfig(config, configuredBy = 'unknown') {
   if (config.baseUrl !== undefined || config.tenantId !== undefined) {
     saveOrbitCredentials(config.tenantId || config.lobId, config.apiKey, configuredBy);
     if (config.baseUrl) {
-      saveApiConfig('lob', config.baseUrl, configuredBy);
+      saveApiConfig('lob', config.baseUrl, null, configuredBy);
     }
     return getOrbitConfigStatus();
   }
@@ -528,7 +639,7 @@ export function saveOrbitConfig(config, configuredBy = 'unknown') {
   if (config.apis) {
     for (const [apiType, apiConfig] of Object.entries(config.apis)) {
       if (VALID_API_TYPES.includes(apiType) && apiConfig.baseUrl !== undefined) {
-        saveApiConfig(apiType, apiConfig.baseUrl, configuredBy);
+        saveApiConfig(apiType, apiConfig.baseUrl, apiConfig.settings || null, configuredBy);
       }
     }
   }

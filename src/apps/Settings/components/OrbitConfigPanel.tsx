@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import { ORBIT_APIS, OrbitApiType, ORBIT_API_KEYS } from '../../../types/orbitApis';
+import {
+  ORBIT_APIS,
+  OrbitApiType,
+  ORBIT_API_KEYS,
+  API_SETTINGS_SCHEMA,
+  ApiSettings,
+} from '../../../types/orbitApis';
 import { useAdminStore } from '../../../store/adminStore';
 
 export default function OrbitConfigPanel() {
@@ -29,9 +35,32 @@ export default function OrbitConfigPanel() {
     chat: '',
   });
 
+  // Settings state - per-API settings
+  const [settings, setSettings] = useState<Record<OrbitApiType, ApiSettings>>({
+    lob: {},
+    registerSocket: {},
+    connection: {},
+    holder: {},
+    verifier: {},
+    issuer: {},
+    chat: {},
+  });
+
+  // Track which API's advanced settings are expanded
+  const [expandedSettings, setExpandedSettings] = useState<Record<OrbitApiType, boolean>>({
+    lob: false,
+    registerSocket: false,
+    connection: false,
+    holder: false,
+    verifier: false,
+    issuer: false,
+    chat: false,
+  });
+
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hasCredentialChanges, setHasCredentialChanges] = useState(false);
   const [hasEndpointChanges, setHasEndpointChanges] = useState(false);
+  const [hasSettingsChanges, setHasSettingsChanges] = useState(false);
 
   // Load config on mount
   useEffect(() => {
@@ -44,7 +73,7 @@ export default function OrbitConfigPanel() {
       setLobId(orbitConfig.lobId || '');
       setApiKey(''); // Never populate API key from stored config
 
-      // Populate endpoints
+      // Populate endpoints and settings
       const newEndpoints: Record<OrbitApiType, string> = {
         lob: '',
         registerSocket: '',
@@ -54,15 +83,28 @@ export default function OrbitConfigPanel() {
         issuer: '',
         chat: '',
       };
+      const newSettings: Record<OrbitApiType, ApiSettings> = {
+        lob: {},
+        registerSocket: {},
+        connection: {},
+        holder: {},
+        verifier: {},
+        issuer: {},
+        chat: {},
+      };
+
       if (orbitConfig.apis) {
         for (const key of ORBIT_API_KEYS) {
           newEndpoints[key] = orbitConfig.apis[key]?.baseUrl || '';
+          newSettings[key] = orbitConfig.apis[key]?.settings || {};
         }
       }
       setEndpoints(newEndpoints);
+      setSettings(newSettings);
 
       setHasCredentialChanges(false);
       setHasEndpointChanges(false);
+      setHasSettingsChanges(false);
     }
   }, [orbitConfig]);
 
@@ -84,6 +126,19 @@ export default function OrbitConfigPanel() {
     setSuccessMessage(null);
   };
 
+  const handleSettingChange = (apiType: OrbitApiType, key: string, value: boolean | string | number) => {
+    setSettings((prev) => ({
+      ...prev,
+      [apiType]: { ...prev[apiType], [key]: value },
+    }));
+    setHasSettingsChanges(true);
+    setSuccessMessage(null);
+  };
+
+  const toggleSettingsExpanded = (apiType: OrbitApiType) => {
+    setExpandedSettings((prev) => ({ ...prev, [apiType]: !prev[apiType] }));
+  };
+
   const handleSaveCredentials = async () => {
     setSuccessMessage(null);
 
@@ -99,15 +154,20 @@ export default function OrbitConfigPanel() {
     }
   };
 
-  const handleSaveEndpoints = async () => {
+  const handleSaveEndpointsAndSettings = async () => {
     setSuccessMessage(null);
 
-    // Save each endpoint that has changed
+    // Save each endpoint and settings that has changed
     let allSuccess = true;
     for (const apiType of ORBIT_API_KEYS) {
-      const currentValue = orbitConfig?.apis?.[apiType]?.baseUrl || '';
-      if (endpoints[apiType] !== currentValue) {
-        const success = await updateApiConfig(apiType, endpoints[apiType]);
+      const currentBaseUrl = orbitConfig?.apis?.[apiType]?.baseUrl || '';
+      const currentSettings = orbitConfig?.apis?.[apiType]?.settings || {};
+
+      const endpointChanged = endpoints[apiType] !== currentBaseUrl;
+      const settingsChanged = JSON.stringify(settings[apiType]) !== JSON.stringify(currentSettings);
+
+      if (endpointChanged || settingsChanged) {
+        const success = await updateApiConfig(apiType, endpoints[apiType], settings[apiType]);
         if (!success) {
           allSuccess = false;
           break;
@@ -116,8 +176,9 @@ export default function OrbitConfigPanel() {
     }
 
     if (allSuccess) {
-      setSuccessMessage('Endpoints saved successfully');
+      setSuccessMessage('Endpoints and settings saved successfully');
       setHasEndpointChanges(false);
+      setHasSettingsChanges(false);
     }
   };
 
@@ -130,6 +191,20 @@ export default function OrbitConfigPanel() {
       await resetOrbitConfig();
       setSuccessMessage('Configuration reset to environment variables');
     }
+  };
+
+  // Check if an API has any settings fields defined
+  const hasSettingsFields = (apiType: OrbitApiType) => {
+    return API_SETTINGS_SCHEMA[apiType]?.fields?.length > 0;
+  };
+
+  // Get current value for a setting field
+  const getSettingValue = (apiType: OrbitApiType, key: string, defaultValue: boolean | string | number | undefined) => {
+    const apiSettings = settings[apiType] as Record<string, unknown>;
+    if (apiSettings && key in apiSettings) {
+      return apiSettings[key];
+    }
+    return defaultValue;
   };
 
   return (
@@ -262,23 +337,144 @@ export default function OrbitConfigPanel() {
         <div className="space-y-4">
           {ORBIT_API_KEYS.map((apiType) => {
             const api = ORBIT_APIS[apiType];
+            const hasSettings = hasSettingsFields(apiType);
+            const isExpanded = expandedSettings[apiType];
+            const settingsSchema = API_SETTINGS_SCHEMA[apiType];
+
             return (
-              <div key={apiType}>
-                <label
-                  htmlFor={`endpoint-${apiType}`}
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  {api.label}
-                </label>
-                <input
-                  type="url"
-                  id={`endpoint-${apiType}`}
-                  value={endpoints[apiType]}
-                  onChange={(e) => handleEndpointChange(apiType, e.target.value)}
-                  placeholder={`https://${apiType}.eapi.nborbit.ca/`}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                />
-                <p className="text-xs text-gray-400 mt-0.5">{api.description}</p>
+              <div key={apiType} className="border border-gray-100 rounded-lg p-3">
+                {/* Endpoint URL */}
+                <div>
+                  <label
+                    htmlFor={`endpoint-${apiType}`}
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    {api.label}
+                  </label>
+                  <input
+                    type="url"
+                    id={`endpoint-${apiType}`}
+                    value={endpoints[apiType]}
+                    onChange={(e) => handleEndpointChange(apiType, e.target.value)}
+                    placeholder={`https://${apiType}.eapi.nborbit.ca/`}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                  <p className="text-xs text-gray-400 mt-0.5">{api.description}</p>
+                </div>
+
+                {/* Advanced Settings Toggle */}
+                {hasSettings && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleSettingsExpanded(apiType)}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      <svg
+                        className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                      Advanced Settings
+                    </button>
+
+                    {/* Collapsible Settings Panel */}
+                    {isExpanded && (
+                      <div className="mt-2 pl-4 border-l-2 border-gray-200 space-y-3">
+                        {settingsSchema.fields.map((field) => {
+                          const currentValue = getSettingValue(apiType, field.key, field.default);
+
+                          if (field.type === 'boolean') {
+                            return (
+                              <label
+                                key={field.key}
+                                className="flex items-start gap-2 cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={currentValue as boolean}
+                                  onChange={(e) =>
+                                    handleSettingChange(apiType, field.key, e.target.checked)
+                                  }
+                                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <div>
+                                  <span className="text-sm text-gray-700">{field.label}</span>
+                                  {field.description && (
+                                    <p className="text-xs text-gray-400">{field.description}</p>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          }
+
+                          if (field.type === 'string' || field.type === 'number') {
+                            return (
+                              <div key={field.key}>
+                                <label className="block text-sm text-gray-700 mb-1">
+                                  {field.label}
+                                </label>
+                                <input
+                                  type={field.type === 'number' ? 'number' : 'text'}
+                                  value={currentValue as string | number}
+                                  onChange={(e) =>
+                                    handleSettingChange(
+                                      apiType,
+                                      field.key,
+                                      field.type === 'number'
+                                        ? parseFloat(e.target.value)
+                                        : e.target.value
+                                    )
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                {field.description && (
+                                  <p className="text-xs text-gray-400 mt-0.5">{field.description}</p>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          if (field.type === 'select' && field.options) {
+                            return (
+                              <div key={field.key}>
+                                <label className="block text-sm text-gray-700 mb-1">
+                                  {field.label}
+                                </label>
+                                <select
+                                  value={currentValue as string}
+                                  onChange={(e) =>
+                                    handleSettingChange(apiType, field.key, e.target.value)
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                  {field.options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                {field.description && (
+                                  <p className="text-xs text-gray-400 mt-0.5">{field.description}</p>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          return null;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -287,14 +483,14 @@ export default function OrbitConfigPanel() {
         {/* Endpoints Actions */}
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
           <button
-            onClick={handleSaveEndpoints}
-            disabled={isOrbitConfigLoading || !hasEndpointChanges}
+            onClick={handleSaveEndpointsAndSettings}
+            disabled={isOrbitConfigLoading || (!hasEndpointChanges && !hasSettingsChanges)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {isOrbitConfigLoading ? 'Saving...' : 'Save Endpoints'}
           </button>
 
-          {hasEndpointChanges && (
+          {(hasEndpointChanges || hasSettingsChanges) && (
             <span className="text-sm text-amber-600">Unsaved changes</span>
           )}
         </div>

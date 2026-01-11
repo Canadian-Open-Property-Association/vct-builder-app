@@ -5,6 +5,7 @@ import {
   OrbitTestResult,
   SettingsSection,
   ApisConfig,
+  ApiSettings,
 } from '../types/orbitApis';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
@@ -149,7 +150,8 @@ interface AdminState {
   // Orbit Configuration actions
   fetchOrbitConfig: () => Promise<void>;
   updateOrbitCredentials: (input: OrbitCredentialsInput) => Promise<boolean>;
-  updateApiConfig: (apiType: OrbitApiType, baseUrl: string) => Promise<boolean>;
+  updateApiConfig: (apiType: OrbitApiType, baseUrl: string, settings?: ApiSettings) => Promise<boolean>;
+  updateApiSettings: (apiType: OrbitApiType, settings: ApiSettings) => Promise<boolean>;
   testApiConnection: (apiType: OrbitApiType, baseUrl?: string) => Promise<OrbitTestResult>;
   resetOrbitConfig: () => Promise<void>;
   clearApiTestResult: (apiType: OrbitApiType) => void;
@@ -413,7 +415,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }
   },
 
-  updateApiConfig: async (apiType: OrbitApiType, baseUrl: string) => {
+  updateApiConfig: async (apiType: OrbitApiType, baseUrl: string, settings?: ApiSettings) => {
     set({ isOrbitConfigLoading: true, orbitConfigError: null });
 
     try {
@@ -423,12 +425,45 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ baseUrl }),
+        body: JSON.stringify({ baseUrl, settings }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to update API configuration');
+      }
+
+      const data = await response.json();
+      set({
+        orbitConfig: data,
+        isOrbitConfigLoading: false,
+      });
+      return true;
+    } catch (error) {
+      set({
+        isOrbitConfigLoading: false,
+        orbitConfigError: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return false;
+    }
+  },
+
+  updateApiSettings: async (apiType: OrbitApiType, settings: ApiSettings) => {
+    set({ isOrbitConfigLoading: true, orbitConfigError: null });
+
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/orbit-api/${apiType}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ settings }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update API settings');
       }
 
       const data = await response.json();

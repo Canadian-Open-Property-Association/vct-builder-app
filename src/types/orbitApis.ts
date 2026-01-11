@@ -48,10 +48,60 @@ export type OrbitApiType = keyof typeof ORBIT_APIS;
 export const ORBIT_API_KEYS: OrbitApiType[] = Object.keys(ORBIT_APIS) as OrbitApiType[];
 
 /**
+ * Per-API settings definitions
+ */
+export interface VerifierSettings {
+  autoVerify?: boolean;
+}
+
+export interface IssuerSettings {
+  // Reserved for future settings
+}
+
+export type ApiSettings = VerifierSettings | IssuerSettings | Record<string, unknown>;
+
+/**
+ * Settings field definition for UI rendering
+ */
+export interface SettingField {
+  key: string;
+  type: 'boolean' | 'string' | 'number' | 'select';
+  label: string;
+  description?: string;
+  default?: boolean | string | number;
+  options?: { value: string; label: string }[]; // For 'select' type
+}
+
+/**
+ * Schema for settings per API type
+ * Defines which settings are available for each API
+ */
+export const API_SETTINGS_SCHEMA: Record<OrbitApiType, { fields: SettingField[] }> = {
+  verifier: {
+    fields: [
+      {
+        key: 'autoVerify',
+        type: 'boolean',
+        label: 'Auto-verify proofs',
+        description: 'Automatically verify proofs without manual review',
+        default: true,
+      },
+    ],
+  },
+  issuer: { fields: [] },
+  lob: { fields: [] },
+  registerSocket: { fields: [] },
+  connection: { fields: [] },
+  holder: { fields: [] },
+  chat: { fields: [] },
+};
+
+/**
  * Configuration for a single API endpoint
  */
 export interface ApiConfig {
   baseUrl: string;
+  settings?: ApiSettings;
 }
 
 /**
@@ -106,12 +156,12 @@ export type SettingsSection = 'orbit' | 'logs' | 'analytics';
  */
 export function getEmptyApisConfig(): ApisConfig {
   return {
-    lob: { baseUrl: '' },
-    registerSocket: { baseUrl: '' },
-    connection: { baseUrl: '' },
-    holder: { baseUrl: '' },
-    verifier: { baseUrl: '' },
-    issuer: { baseUrl: '' },
-    chat: { baseUrl: '' },
+    lob: { baseUrl: '', settings: {} },
+    registerSocket: { baseUrl: '', settings: {} },
+    connection: { baseUrl: '', settings: {} },
+    holder: { baseUrl: '', settings: {} },
+    verifier: { baseUrl: '', settings: {} },
+    issuer: { baseUrl: '', settings: {} },
+    chat: { baseUrl: '', settings: {} },
   };
 }
