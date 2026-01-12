@@ -8,7 +8,6 @@
 import { useState, useEffect } from 'react';
 import { useCatalogueStore } from '../../../store/catalogueStore';
 import { PREDEFINED_ECOSYSTEM_TAGS } from '../../../types/catalogue';
-import type { ImportErrorDetails } from '../../../types/catalogue';
 
 type WizardStep = 'schema' | 'creddef' | 'details' | 'confirm';
 
