@@ -167,16 +167,6 @@ export const AVAILABLE_APPS = [
     name: 'Credential Catalogue',
     description: 'Import external credentials for verification',
   },
-  {
-    id: 'dev-tools',
-    name: 'Developer Tools',
-    description: 'API docs and vocabulary reference',
-  },
-  {
-    id: 'property-access-demo',
-    name: 'Property Access Authorization',
-    description: 'Credential-based property access demo',
-  },
 ] as const;
 
 /**

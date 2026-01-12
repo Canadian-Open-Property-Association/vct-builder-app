@@ -33,6 +33,7 @@ export default function SettingsApp() {
     clearFilters,
     selectedSection,
     selectedOrbitApi,
+    setSelectedSection,
   } = useAdminStore();
 
   // Fetch initial data on mount
@@ -40,6 +41,13 @@ export default function SettingsApp() {
     fetchLogs();
     fetchOrbitConfig();
   }, [fetchLogs, fetchOrbitConfig]);
+
+  // Reset to first section when leaving Settings app
+  useEffect(() => {
+    return () => {
+      setSelectedSection('ecosystem');
+    };
+  }, [setSelectedSection]);
 
   const handlePageChange = (page: number) => {
     fetchLogs(filters, page);

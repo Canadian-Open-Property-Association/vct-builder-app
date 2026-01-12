@@ -13,7 +13,6 @@ import SettingsApp from './apps/Settings/SettingsApp';
 import DataDictionaryApp from './apps/DataDictionary/DataDictionaryApp';
 import DataHarmonizationApp from './apps/DataHarmonization/DataHarmonizationApp';
 import EntityManagerApp from './apps/EntityManager/EntityManagerApp';
-import DevToolsApp from './apps/DevTools/DevToolsApp';
 import ProofTemplatesApp from './apps/ProofTemplates/ProofTemplatesApp';
 import FormsBuilderApp from './apps/FormsBuilder/FormsBuilderApp';
 import TestIssuerApp from './apps/TestIssuer/TestIssuerApp';
@@ -55,12 +54,6 @@ const DataHarmonizationIcon = (
 const EntityManagerIcon = (
   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-  </svg>
-);
-
-const DevToolsIcon = (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
   </svg>
 );
 
@@ -189,19 +182,6 @@ function App() {
               <PlatformShell appName="Entity Manager" appIcon={EntityManagerIcon}>
                 <AppErrorBoundary appName="Entity Manager">
                   <EntityManagerApp />
-                </AppErrorBoundary>
-              </PlatformShell>
-            </AuthGuard>
-          }
-        />
-
-        <Route
-          path="/apps/dev-tools/*"
-          element={
-            <AuthGuard>
-              <PlatformShell appName="Developer Tools" appIcon={DevToolsIcon}>
-                <AppErrorBoundary appName="Developer Tools">
-                  <DevToolsApp />
                 </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>
