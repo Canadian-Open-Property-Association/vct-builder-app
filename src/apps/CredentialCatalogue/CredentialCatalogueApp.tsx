@@ -15,6 +15,7 @@ import { Routes, Route } from 'react-router-dom';
 import { useAppTracking } from '../../hooks/useAppTracking';
 import CatalogueGrid from './components/CatalogueGrid';
 import ImportWizard from './components/ImportWizard';
+import CredentialDetail from './components/CredentialDetail';
 
 export default function CredentialCatalogueApp() {
   useAppTracking('credential-catalogue', 'Credential Catalogue');
@@ -24,10 +25,7 @@ export default function CredentialCatalogueApp() {
       <Routes>
         <Route path="/" element={<CatalogueGrid />} />
         <Route path="/import" element={<ImportWizard />} />
-        {/* Future routes:
         <Route path="/:id" element={<CredentialDetail />} />
-        <Route path="/settings" element={<CatalogueSettings />} />
-        */}
       </Routes>
     </div>
   );
