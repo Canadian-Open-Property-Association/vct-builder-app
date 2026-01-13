@@ -329,16 +329,11 @@ export default function CredentialList({ onAddCredential, onOpenSettings }: Cred
                                 </svg>
                               </div>
 
-                              {/* Name and version */}
+                              {/* Name */}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-900 text-sm truncate">
-                                    {credential.name}
-                                  </span>
-                                  <span className="text-xs text-gray-400 flex-shrink-0">
-                                    v{credential.version}
-                                  </span>
-                                </div>
+                                <span className="font-medium text-gray-900 text-sm line-clamp-2 break-words">
+                                  {credential.name}
+                                </span>
                                 {/* Issuer name or ledger */}
                                 <div className="flex items-center gap-2 mt-0.5">
                                   {credential.issuerName ? (

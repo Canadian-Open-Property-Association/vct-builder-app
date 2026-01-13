@@ -206,6 +206,9 @@ export default function CredentialDetail({ credential }: CredentialDetailProps) 
     ? getLogoUrl(issuerEntity.id, issuerEntity.logoUri)
     : null;
 
+  // Get issuer's brand color for banner (fallback to purple)
+  const bannerColor = issuerEntity?.primaryColor || '#7c3aed'; // purple-600 as fallback
+
   // Reset selected tag when credential changes
   useEffect(() => {
     setSelectedTagId(credential.ecosystemTag || 'other');
@@ -251,8 +254,11 @@ export default function CredentialDetail({ credential }: CredentialDetailProps) 
 
   return (
     <div>
-      {/* Banner Header */}
-      <div className="h-16 relative bg-gradient-to-r from-purple-600 to-purple-700">
+      {/* Banner Header - uses issuer's brand color */}
+      <div
+        className="h-16 relative"
+        style={{ background: `linear-gradient(to right, ${bannerColor}, ${bannerColor}dd)` }}
+      >
         <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-black/20" />
       </div>
 
@@ -262,7 +268,8 @@ export default function CredentialDetail({ credential }: CredentialDetailProps) 
         <div className="flex items-end -mt-6 relative z-10 mb-4">
           <div className="w-12 h-12 rounded-xl bg-white shadow-lg border-4 border-white flex items-center justify-center overflow-hidden flex-shrink-0">
             <svg
-              className="w-6 h-6 text-purple-600"
+              className="w-6 h-6"
+              style={{ color: bannerColor }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
