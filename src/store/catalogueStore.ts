@@ -79,6 +79,11 @@ interface CatalogueState {
   ) => Promise<CloneForIssuanceResponse>;
   deleteClone: (credentialId: string) => Promise<void>;
 
+  // Actions - Test Issuer Integration
+  toggleIssuanceEnabled: (credentialId: string, enabled: boolean) => Promise<void>;
+  getClonedCredentials: () => CatalogueCredential[];
+  getIssuableCredentials: () => CatalogueCredential[];
+
   // Utility
   clearError: () => void;
   clearCloneError: () => void;
@@ -625,4 +630,62 @@ export const useCatalogueStore = create<CatalogueState>((set, get) => ({
 
   // Clear clone error
   clearCloneError: () => set({ cloneError: null, cloneErrorDetails: null }),
+
+  // Toggle issuance enablement for a cloned credential
+  toggleIssuanceEnabled: async (credentialId: string, enabled: boolean) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/credential-catalogue/${credentialId}/issuable`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ enabled }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update issuance status');
+      }
+
+      // Update the credential in the store
+      set((state) => {
+        const updatedCredentials = state.credentials.map((c) => {
+          if (c.id === credentialId) {
+            return { ...c, enabledForIssuance: enabled };
+          }
+          return c;
+        });
+
+        const updatedSelected =
+          state.selectedCredential?.id === credentialId
+            ? updatedCredentials.find((c) => c.id === credentialId) || null
+            : state.selectedCredential;
+
+        return {
+          credentials: updatedCredentials,
+          selectedCredential: updatedSelected,
+          isLoading: false,
+        };
+      });
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to update issuance status',
+        isLoading: false,
+      });
+      throw err;
+    }
+  },
+
+  // Get all cloned credentials (credentials that have been cloned for issuance)
+  getClonedCredentials: () => {
+    return get().credentials.filter((c) => c.clonedAt);
+  },
+
+  // Get credentials that are enabled for issuance in Test Issuer
+  getIssuableCredentials: () => {
+    return get().credentials.filter((c) => c.clonedAt && c.enabledForIssuance);
+  },
 }));

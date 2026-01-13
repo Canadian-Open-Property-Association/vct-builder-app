@@ -1513,6 +1513,71 @@ router.post('/import/creddef', async (req, res) => {
   }
 });
 
+// ============ Test Issuer Integration Endpoints ============
+// NOTE: These MUST come before /:id routes
+
+/**
+ * GET /api/credential-catalogue/issuable
+ * Get all cloned credentials with their issuance toggle state
+ */
+router.get('/issuable', (req, res) => {
+  try {
+    const credentials = readCredentials();
+    // Filter to only cloned credentials
+    const clonedCredentials = credentials.filter((c) => c.clonedAt);
+    res.json(clonedCredentials);
+  } catch (err) {
+    console.error('[CredentialCatalogue] Failed to list issuable credentials:', err);
+    res.status(500).json({ error: 'Failed to list issuable credentials' });
+  }
+});
+
+/**
+ * PATCH /api/credential-catalogue/:id/issuable
+ * Toggle whether a cloned credential is enabled for Test Issuer
+ */
+router.patch('/:id/issuable', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+
+    const credentials = readCredentials();
+    const index = credentials.findIndex((c) => c.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ error: 'Credential not found' });
+    }
+
+    const credential = credentials[index];
+
+    // Ensure the credential has been cloned
+    if (!credential.clonedAt) {
+      return res.status(400).json({
+        error: 'Only cloned credentials can be enabled for issuance. Clone this credential first.',
+      });
+    }
+
+    // Update the enabledForIssuance flag
+    credentials[index].enabledForIssuance = enabled;
+    writeCredentials(credentials);
+
+    console.log(
+      '[CredentialCatalogue] Toggled issuance for',
+      credential.name,
+      '-> enabled:',
+      enabled
+    );
+    res.json(credentials[index]);
+  } catch (err) {
+    console.error('[CredentialCatalogue] Failed to toggle issuance:', err);
+    res.status(500).json({ error: 'Failed to toggle issuance' });
+  }
+});
+
 // ============ Parameterized Credential Endpoints ============
 // NOTE: These MUST come AFTER all specific path routes like /tags and /import/*
 

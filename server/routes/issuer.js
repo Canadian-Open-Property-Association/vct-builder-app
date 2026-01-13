@@ -364,6 +364,121 @@ router.post('/offers', requireAuth, requireOrbit, async (req, res) => {
 });
 
 /**
+ * POST /api/issuer/offers/catalogue
+ * Create a credential offer from a Catalogue credential
+ * Uses the cloned credential definition for issuance via Orbit
+ */
+router.post('/offers/catalogue', requireAuth, requireOrbit, async (req, res) => {
+  try {
+    const { catalogueCredentialId, credentialId, credAttributes, socketSessionId } = req.body;
+
+    if (!catalogueCredentialId || !credentialId) {
+      return res.status(400).json({
+        error: 'catalogueCredentialId and credentialId are required',
+      });
+    }
+
+    if (!credAttributes || typeof credAttributes !== 'object') {
+      return res.status(400).json({ error: 'credAttributes is required' });
+    }
+
+    const issuerConfig = getOrbitApiConfig('issuer');
+
+    if (!issuerConfig || !issuerConfig.baseUrl || !issuerConfig.lobId) {
+      return res.status(503).json({
+        error: 'Issuer API not properly configured',
+        message: 'Please configure the Issuer API with Base URL and LOB ID in Settings.',
+      });
+    }
+
+    // Normalize baseUrl to remove trailing slashes
+    const normalizedBaseUrl = issuerConfig.baseUrl.replace(/\/+$/, '');
+
+    // Prepare credential offer payload per Orbit Issuer API spec
+    const payload = {
+      credentialId: credentialId,
+      credAttributes: credAttributes,
+      comment: 'Credential offer from Test Issuer',
+      messageProtocol: 'AIP2_0',
+      credAutoIssue: true,
+      ...(socketSessionId && { socketSessionId }),
+    };
+
+    const url = `${normalizedBaseUrl}/api/lob/${issuerConfig.lobId}/credential/offer`;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(issuerConfig.apiKey && { 'api-key': issuerConfig.apiKey }),
+    };
+
+    console.log('[Issuer] Creating credential offer:');
+    console.log('[Issuer]   URL:', url);
+    console.log('[Issuer]   Credential ID:', credentialId);
+    console.log('[Issuer]   Attributes:', Object.keys(credAttributes).length);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    const responseText = await response.text();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = {};
+    }
+
+    if (!response.ok) {
+      console.error('[Issuer] Credential offer failed:', response.status, responseText);
+      return res.status(response.status).json({
+        error: result.message || result.error || 'Failed to create credential offer',
+        details: responseText,
+      });
+    }
+
+    console.log('[Issuer] Credential offer created successfully');
+    console.log('[Issuer]   Offer ID:', result.data?.credOfferId);
+    console.log('[Issuer]   Short URL:', result.data?.shortUrl);
+
+    // Store offer locally for tracking
+    const offerId = result.data?.credOfferId || crypto.randomUUID();
+    const now = new Date();
+    const offer = {
+      id: offerId,
+      userId: req.user.githubUserId,
+      catalogueCredentialId,
+      credentialId,
+      credAttributes,
+      status: 'pending',
+      shortUrl: result.data?.shortUrl,
+      longUrl: result.data?.longUrl,
+      orbitOfferId: result.data?.credOfferId,
+      expiresAt: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
+    credentialOffers.set(offerId, offer);
+
+    res.status(201).json({
+      offerId: offer.id,
+      credOfferId: result.data?.credOfferId,
+      shortUrl: result.data?.shortUrl,
+      longUrl: result.data?.longUrl,
+      status: 'pending',
+      expiresAt: offer.expiresAt,
+    });
+  } catch (error) {
+    console.error('[Issuer] Error creating catalogue offer:', error);
+    res.status(500).json({
+      error: 'Failed to create credential offer',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/issuer/offers/:id
  * Get a single offer with its current status
  */

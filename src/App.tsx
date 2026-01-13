@@ -15,7 +15,7 @@ import DataHarmonizationApp from './apps/DataHarmonization/DataHarmonizationApp'
 import EntityManagerApp from './apps/EntityManager/EntityManagerApp';
 import ProofTemplatesApp from './apps/ProofTemplates/ProofTemplatesApp';
 import FormsBuilderApp from './apps/FormsBuilder/FormsBuilderApp';
-import TestIssuerApp from './apps/TestIssuer/TestIssuerApp';
+import TestIssuerAppV2 from './apps/TestIssuer/TestIssuerAppV2';
 import BadgesApp from './apps/Badges/BadgesApp';
 import CredentialCatalogueApp from './apps/CredentialCatalogue/CredentialCatalogueApp';
 
@@ -220,7 +220,7 @@ function App() {
             <AuthGuard>
               <PlatformShell appName="Test Issuer" appIcon={TestIssuerIcon}>
                 <AppErrorBoundary appName="Test Issuer">
-                  <TestIssuerApp />
+                  <TestIssuerAppV2 />
                 </AppErrorBoundary>
               </PlatformShell>
             </AuthGuard>

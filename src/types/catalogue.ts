@@ -158,6 +158,44 @@ export interface CatalogueCredential {
 
   /** Log entry for cloned cred def creation in Orbit */
   clonedOrbitCredDefLog?: OrbitOperationLog;
+
+  // === Test Issuer Integration ===
+
+  /** Whether this cloned credential is enabled for issuance in Test Issuer */
+  enabledForIssuance?: boolean;
+}
+
+/**
+ * Credential available for issuance in Test Issuer
+ * Derived from cloned CatalogueCredentials
+ */
+export interface IssuableCredential {
+  /** Catalogue credential ID */
+  id: string;
+
+  /** Schema name */
+  name: string;
+
+  /** Schema version */
+  version: string;
+
+  /** List of attribute names */
+  attributes: string[];
+
+  /** Ecosystem tag for display */
+  ecosystemTag: string;
+
+  /** Orbit credential definition ID (required for Orbit API) */
+  clonedOrbitCredDefId: number;
+
+  /** Orbit schema ID */
+  clonedOrbitSchemaId: number;
+
+  /** Ledger credential definition ID */
+  clonedCredDefId: string;
+
+  /** Whether currently enabled for Test Issuer */
+  enabled: boolean;
 }
 
 /**
