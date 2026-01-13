@@ -189,6 +189,36 @@ const registerSchemaWithOrbit = async (schemaData) => {
     console.log('[CredentialCatalogue]   Headers:', Object.fromEntries(response.headers.entries()));
 
     const responseText = await response.text();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = {};
+    }
+
+    // Handle 409 Conflict - schema already exists, extract the schemaId and treat as success
+    if (response.status === 409) {
+      const existingSchemaId = result.schemaId || result.data?.schemaId;
+      if (existingSchemaId) {
+        console.log('[CredentialCatalogue] ====== ORBIT SCHEMA ALREADY EXISTS (409) ======');
+        console.log('[CredentialCatalogue] Existing Schema ID:', existingSchemaId);
+        console.log('[CredentialCatalogue] ==========================================');
+
+        return {
+          log: {
+            success: true, // Treat as success since we have the ID
+            timestamp,
+            requestUrl: url,
+            requestPayload: payload,
+            statusCode: response.status,
+            responseBody: responseText,
+            responseData: result,
+            errorMessage: 'Schema already exists in Orbit (using existing ID)',
+          },
+          orbitSchemaId: existingSchemaId,
+        };
+      }
+    }
 
     if (!response.ok) {
       console.error('[CredentialCatalogue] ====== ORBIT SCHEMA IMPORT FAILED ======');
@@ -210,7 +240,6 @@ const registerSchemaWithOrbit = async (schemaData) => {
       };
     }
 
-    const result = JSON.parse(responseText);
     console.log('[CredentialCatalogue] ====== ORBIT SCHEMA IMPORT SUCCESS ======');
     console.log('[CredentialCatalogue] Response:', JSON.stringify(result, null, 2));
     console.log('[CredentialCatalogue] ==========================================');
@@ -337,6 +366,37 @@ const registerCredDefWithOrbit = async (credDefData, orbitSchemaId) => {
     console.log('[CredentialCatalogue]   Status:', response.status, response.statusText);
 
     const responseText = await response.text();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = {};
+    }
+
+    // Handle 409 Conflict - cred def already exists, extract the credDefId and treat as success
+    if (response.status === 409) {
+      // Orbit returns credDefId or credentialId in the response for conflicts
+      const existingCredDefId = result.credDefId || result.credentialId || result.data?.credDefId || result.data?.credentialId;
+      if (existingCredDefId) {
+        console.log('[CredentialCatalogue] ====== ORBIT CRED DEF ALREADY EXISTS (409) ======');
+        console.log('[CredentialCatalogue] Existing Cred Def ID:', existingCredDefId);
+        console.log('[CredentialCatalogue] ==========================================');
+
+        return {
+          log: {
+            success: true, // Treat as success since we have the ID
+            timestamp,
+            requestUrl: url,
+            requestPayload: payload,
+            statusCode: response.status,
+            responseBody: responseText,
+            responseData: result,
+            errorMessage: 'Credential definition already exists in Orbit (using existing ID)',
+          },
+          orbitCredDefId: existingCredDefId,
+        };
+      }
+    }
 
     if (!response.ok) {
       console.error('[CredentialCatalogue] ====== ORBIT CRED DEF IMPORT FAILED ======');
@@ -358,7 +418,6 @@ const registerCredDefWithOrbit = async (credDefData, orbitSchemaId) => {
       };
     }
 
-    const result = JSON.parse(responseText);
     console.log('[CredentialCatalogue] ====== ORBIT CRED DEF IMPORT SUCCESS ======');
     console.log('[CredentialCatalogue] Response:', JSON.stringify(result, null, 2));
     console.log('[CredentialCatalogue] ==========================================');
