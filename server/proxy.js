@@ -1625,10 +1625,15 @@ app.get('/api/orbit/config', requireProjectAuth, (req, res) => {
 // =============================================================================
 
 /**
- * Register a socket session with Orbit RegisterSocket API
+ * Get socket configuration for client-side socket.io connection
  * Used by Test Issuer, Test Verifier, and other apps that need real-time events
  *
- * Returns: { socketSessionId, websocketUrl }
+ * The client will:
+ * 1. Connect to socketUrl using socket.io-client
+ * 2. Emit REGISTER_SOCKET event with lobId
+ * 3. Listen for REGISTER_SOCKET_RESPONSE to get sessionId
+ *
+ * Returns: { socketUrl, lobId }
  * Returns 503 if RegisterSocket API is not configured
  */
 app.post('/api/socket/register', requireProjectAuth, async (req, res) => {
@@ -1649,43 +1654,17 @@ app.post('/api/socket/register', requireProjectAuth, async (req, res) => {
       });
     }
 
-    // Call Orbit RegisterSocket API to register a new session
-    const registerUrl = `${registerSocketConfig.baseUrl}/api/lob/${registerSocketConfig.lobId}/socket/register`;
+    // Log the socket config request
+    logAccess(req.session?.user?.id || 'unknown', req.session?.user?.login || 'unknown', 'socket_config', 'system');
 
-    const response = await fetch(registerUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': registerSocketConfig.apiKey || '',
-        'x-lob-id': registerSocketConfig.lobId,
-      },
-      body: JSON.stringify({
-        clientType: 'webapp',
-        userId: String(req.session.user.id),
-        username: req.session.user.login,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Socket registration failed:', response.status, errorText);
-      return res.status(response.status).json({
-        error: 'Socket registration failed',
-        message: `Orbit API returned ${response.status}`,
-      });
-    }
-
-    const data = await response.json();
-
-    // Log the socket registration
-    logAccess(req.session?.user?.id || 'unknown', req.session?.user?.login || 'unknown', 'socket_register', 'system');
-
+    // Return socket URL for client-side socket.io connection
+    // Client will handle the REGISTER_SOCKET protocol
     res.json({
-      socketSessionId: data.socketSessionId || data.sessionId,
-      websocketUrl: data.websocketUrl || data.wsUrl,
+      socketUrl: registerSocketConfig.baseUrl.replace(/\/+$/, ''), // Remove trailing slash
+      lobId: registerSocketConfig.lobId,
     });
   } catch (error) {
-    console.error('Error registering socket session:', error);
+    console.error('Error getting socket config:', error);
     res.status(500).json({ error: error.message });
   }
 });

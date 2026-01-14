@@ -18,8 +18,9 @@ import {
   getEndpointKey,
 } from '../../../types/orbitApis';
 import EndpointConfigPanel from './EndpointConfigPanel';
+import RegisterSocketDebugPanel from './RegisterSocketDebugPanel';
 
-type TabType = 'overview' | 'endpoints' | 'settings';
+type TabType = 'overview' | 'endpoints' | 'settings' | 'debug';
 
 interface OrbitApiDetailProps {
   apiType: OrbitApiType;
@@ -162,6 +163,8 @@ export default function OrbitApiDetail({ apiType }: OrbitApiDetailProps) {
     { id: 'overview', label: 'Overview' },
     { id: 'endpoints', label: 'Endpoints', count: swaggerSpec?.endpoints?.length },
     { id: 'settings', label: 'Settings' },
+    // Add Debug tab only for registerSocket API
+    ...(apiType === 'registerSocket' ? [{ id: 'debug' as TabType, label: 'Debug' }] : []),
   ];
 
   return (
@@ -647,6 +650,16 @@ export default function OrbitApiDetail({ apiType }: OrbitApiDetailProps) {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Debug Tab - Only for RegisterSocket */}
+        {activeTab === 'debug' && apiType === 'registerSocket' && (
+          <div className="max-w-2xl">
+            <RegisterSocketDebugPanel
+              socketUrl={apiConfig?.baseUrl || null}
+              lobId={orbitConfig?.lobId || null}
+            />
           </div>
         )}
       </div>

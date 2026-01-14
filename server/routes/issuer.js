@@ -507,6 +507,152 @@ router.post('/offers/catalogue', requireAuth, requireOrbit, async (req, res) => 
 });
 
 /**
+ * POST /api/issuer/offers/prepare
+ * Prepare a credential offer URL for QR code display
+ * Uses Orbit's prepare-url-offer endpoint for the two-step issuance flow:
+ * 1. prepare-url-offer → get shortUrl for QR code
+ * 2. Display QR, holder scans
+ * 3. Socket events notify of status changes (offer-received, credential-accepted, done)
+ */
+router.post('/offers/prepare', requireAuth, requireOrbit, async (req, res) => {
+  const timestamp = new Date().toISOString();
+
+  try {
+    const { credentialId, credAttributes, socketSessionId } = req.body;
+
+    if (!credentialId) {
+      return res.status(400).json({
+        error: 'credentialId is required',
+      });
+    }
+
+    if (!credAttributes || typeof credAttributes !== 'object') {
+      return res.status(400).json({ error: 'credAttributes is required' });
+    }
+
+    const issuerConfig = getOrbitApiConfig('issuer');
+
+    if (!issuerConfig || !issuerConfig.baseUrl || !issuerConfig.lobId) {
+      return res.status(503).json({
+        error: 'Issuer API not properly configured',
+        message: 'Please configure the Issuer API with Base URL and LOB ID in Settings.',
+      });
+    }
+
+    // Normalize baseUrl to remove trailing slashes
+    const normalizedBaseUrl = issuerConfig.baseUrl.replace(/\/+$/, '');
+
+    // Prepare credential offer payload per Orbit Issuer API spec
+    const payload = {
+      credentialId: credentialId,
+      credAttributes: credAttributes,
+      comment: 'Credential offer from Test Issuer',
+      messageProtocol: 'AIP2_0',
+      credAutoIssue: true,
+      ...(socketSessionId && { socketSessionId }),
+    };
+
+    // Use prepare-url-offer endpoint for QR code generation
+    const url = `${normalizedBaseUrl}/api/lob/${issuerConfig.lobId}/prepare-url-offer`;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(issuerConfig.apiKey && { 'api-key': issuerConfig.apiKey }),
+    };
+
+    console.log('[Issuer] Preparing credential offer URL:');
+    console.log('[Issuer]   URL:', url);
+    console.log('[Issuer]   Credential ID:', credentialId);
+    console.log('[Issuer]   Socket Session:', socketSessionId || 'none');
+    console.log('[Issuer]   Attributes:', Object.keys(credAttributes).length);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    const responseText = await response.text();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = {};
+    }
+
+    if (!response.ok) {
+      console.error('[Issuer] Prepare offer failed:', response.status, responseText);
+      return res.status(response.status).json({
+        error: result.message || result.error || 'Failed to prepare credential offer',
+        apiDetails: {
+          message: result.message || result.error || 'Failed to prepare credential offer',
+          timestamp,
+          requestUrl: url,
+          requestMethod: 'POST',
+          requestPayload: payload,
+          statusCode: response.status,
+          responseBody: responseText,
+        },
+      });
+    }
+
+    console.log('[Issuer] Credential offer prepared successfully');
+    console.log('[Issuer]   Offer ID:', result.data?.credOfferId);
+    console.log('[Issuer]   Short URL:', result.data?.shortUrl);
+
+    // Store offer locally for tracking
+    const offerId = result.data?.credOfferId || crypto.randomUUID();
+    const now = new Date();
+    const offer = {
+      id: offerId,
+      userId: req.user.githubUserId,
+      credentialId,
+      credAttributes,
+      status: 'pending',
+      shortUrl: result.data?.shortUrl,
+      longUrl: result.data?.longUrl,
+      orbitOfferId: result.data?.credOfferId,
+      expiresAt: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
+    credentialOffers.set(offerId, offer);
+
+    res.status(201).json({
+      offerId: offer.id,
+      credOfferId: result.data?.credOfferId,
+      shortUrl: result.data?.shortUrl,
+      longUrl: result.data?.longUrl,
+      status: 'pending',
+      expiresAt: offer.expiresAt,
+      apiDetails: {
+        message: 'Credential offer prepared successfully',
+        timestamp,
+        requestUrl: url,
+        requestMethod: 'POST',
+        requestPayload: payload,
+        statusCode: response.status,
+        responseBody: responseText,
+      },
+    });
+  } catch (error) {
+    console.error('[Issuer] Error preparing offer:', error);
+    res.status(500).json({
+      error: 'Failed to prepare credential offer',
+      message: error.message,
+      apiDetails: {
+        message: error.message,
+        timestamp,
+        requestUrl: 'Unknown (error occurred before request)',
+        requestMethod: 'POST',
+        statusCode: 500,
+        responseBody: error.stack || error.message,
+      },
+    });
+  }
+});
+
+/**
  * GET /api/issuer/offers/:id
  * Get a single offer with its current status
  */

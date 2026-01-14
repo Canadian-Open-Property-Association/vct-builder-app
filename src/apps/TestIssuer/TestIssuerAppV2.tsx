@@ -40,11 +40,17 @@ export default function TestIssuerAppV2() {
       let newStatus: OfferStatus | null = null;
 
       switch (event) {
+        case 'offer_received':
+          // Holder received offer in wallet (scanned QR)
+          newStatus = 'scanned';
+          break;
         case 'offer_accepted':
+          // Holder accepted the credential offer
           newStatus = 'accepted';
           break;
         case 'credential_issued':
-          newStatus = 'issued';
+          // Credential stored in wallet - complete!
+          newStatus = 'completed';
           break;
         case 'done':
           newStatus = 'completed';
@@ -79,7 +85,7 @@ export default function TestIssuerAppV2() {
     setErrorDetails(null);
   };
 
-  // Handle generate offer
+  // Handle generate offer - uses prepare-url-offer endpoint for proper QR code generation
   const handleGenerateOffer = async (attributeValues: Record<string, string>) => {
     if (!selectedCredential || !selectedCredential.clonedOrbitCredDefId) {
       setError('Selected credential is not properly configured for issuance');
@@ -92,12 +98,12 @@ export default function TestIssuerAppV2() {
     setErrorDetails(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/issuer/offers/catalogue`, {
+      // Use the prepare endpoint which calls Orbit's prepare-url-offer
+      const response = await fetch(`${API_BASE}/api/issuer/offers/prepare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          catalogueCredentialId: selectedCredential.id,
           credentialId: selectedCredential.clonedOrbitCredDefId,
           credAttributes: attributeValues,
           socketSessionId: sessionId,
@@ -107,7 +113,7 @@ export default function TestIssuerAppV2() {
       const responseData = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(responseData.error || 'Failed to create credential offer');
+        setError(responseData.error || 'Failed to prepare credential offer');
         // Set detailed error info if available from backend
         if (responseData.apiDetails) {
           setErrorDetails(responseData.apiDetails);
@@ -124,8 +130,8 @@ export default function TestIssuerAppV2() {
         expiresAt: responseData.expiresAt,
       });
     } catch (err) {
-      console.error('[TestIssuer] Failed to create offer:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create credential offer');
+      console.error('[TestIssuer] Failed to prepare offer:', err);
+      setError(err instanceof Error ? err.message : 'Failed to prepare credential offer');
       setErrorDetails(null);
     } finally {
       setIsGenerating(false);

@@ -1,17 +1,19 @@
 /**
  * Orbit WebSocket Hook
  *
- * Manages WebSocket connections to Orbit for real-time credential exchange events.
+ * Manages socket.io connections to Orbit RegisterSocket for real-time credential exchange events.
  * Used by Test Issuer, Test Verifier, and other apps that need real-time updates.
  *
  * Features:
- * - Automatic socket session registration on mount
- * - WebSocket connection management with reconnection
- * - Event handling for credential exchange events
+ * - Uses socket.io-client for proper Orbit compatibility
+ * - Hybrid connection model: reuses existing session if available
+ * - Event handling for ISSUANCE_RESPONSE and other Orbit events
+ * - Automatic reconnection
  * - Cleanup on unmount
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { socketService, SocketConnectionStatus } from '../lib/socketService';
 
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
 
@@ -19,11 +21,14 @@ const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:5174';
  * Credential exchange event types from Orbit
  */
 export type OrbitEventType =
+  | 'offer_received'
   | 'offer_accepted'
   | 'credential_issued'
   | 'proof_received'
   | 'proof_verified'
   | 'connection_established'
+  | 'connection'
+  | 'verification'
   | 'error'
   | 'done';
 
@@ -37,6 +42,7 @@ export interface OrbitEventData {
   proofId?: string;
   status?: string;
   error?: string;
+  raw?: unknown;
   [key: string]: unknown;
 }
 
@@ -50,22 +56,16 @@ interface UseOrbitSocketOptions {
   onEvent?: (event: OrbitEventType, data: OrbitEventData) => void;
   /** Whether to enable the socket connection */
   enabled?: boolean;
-  /** Auto-reconnect on disconnect */
-  autoReconnect?: boolean;
-  /** Reconnect delay in ms */
-  reconnectDelay?: number;
 }
 
 /**
  * Socket connection state
  */
 interface SocketState {
-  /** Whether the WebSocket is connected */
+  /** Whether the socket.io is connected */
   connected: boolean;
   /** Session ID from Orbit */
   sessionId: string | null;
-  /** WebSocket URL */
-  websocketUrl: string | null;
   /** Error message if registration/connection failed */
   error: string | null;
   /** Whether registration is in progress */
@@ -73,7 +73,7 @@ interface SocketState {
 }
 
 /**
- * Hook for managing Orbit WebSocket connections
+ * Hook for managing Orbit socket.io connections
  *
  * @example
  * ```tsx
@@ -91,33 +91,26 @@ export function useOrbitSocket({
   appName,
   onEvent,
   enabled = true,
-  autoReconnect = true,
-  reconnectDelay = 3000,
 }: UseOrbitSocketOptions) {
   const [state, setState] = useState<SocketState>({
-    connected: false,
-    sessionId: null,
-    websocketUrl: null,
+    connected: socketService.isConnected(),
+    sessionId: socketService.getSessionId(),
     error: null,
     isRegistering: false,
   });
 
-  const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
   /**
-   * Register a socket session with the server
+   * Get socket configuration from server
    */
-  const registerSession = useCallback(async (): Promise<{
-    socketSessionId: string;
-    websocketUrl: string;
+  const getSocketConfig = useCallback(async (): Promise<{
+    socketUrl: string;
+    lobId: string;
   } | null> => {
     try {
-      setState((s) => ({ ...s, isRegistering: true, error: null }));
-
       const response = await fetch(`${API_BASE}/api/socket/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,18 +120,22 @@ export function useOrbitSocket({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Registration failed: ${response.status}`);
+        throw new Error(errorData.error || `Failed to get socket config: ${response.status}`);
       }
 
       const data = await response.json();
 
-      if (!data.socketSessionId || !data.websocketUrl) {
-        throw new Error('Invalid response from socket registration');
+      if (!data.socketUrl) {
+        throw new Error('Invalid response: missing socketUrl');
       }
 
-      return data;
+      return {
+        socketUrl: data.socketUrl,
+        lobId: data.lobId,
+      };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Socket registration failed';
+      const message = error instanceof Error ? error.message : 'Failed to get socket configuration';
+      console.error(`[${appName}] Socket config error:`, message);
       if (mountedRef.current) {
         setState((s) => ({ ...s, error: message, isRegistering: false }));
       }
@@ -147,125 +144,126 @@ export function useOrbitSocket({
   }, [appName]);
 
   /**
-   * Connect to the WebSocket
-   */
-  const connect = useCallback(
-    (websocketUrl: string, sessionId: string) => {
-      // Close existing connection if any
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-
-      try {
-        // Append session ID as query param if not already in URL
-        const url = new URL(websocketUrl);
-        if (!url.searchParams.has('sessionId')) {
-          url.searchParams.set('sessionId', sessionId);
-        }
-
-        const socket = new WebSocket(url.toString());
-
-        socket.onopen = () => {
-          console.log(`[${appName}] WebSocket connected`);
-          if (mountedRef.current) {
-            setState((s) => ({
-              ...s,
-              connected: true,
-              sessionId,
-              websocketUrl,
-              isRegistering: false,
-              error: null,
-            }));
-          }
-        };
-
-        socket.onclose = (event) => {
-          console.log(`[${appName}] WebSocket closed:`, event.code, event.reason);
-          if (mountedRef.current) {
-            setState((s) => ({ ...s, connected: false }));
-
-            // Auto-reconnect if enabled and not a clean close
-            if (autoReconnect && event.code !== 1000) {
-              reconnectTimeoutRef.current = setTimeout(() => {
-                if (mountedRef.current && enabled) {
-                  console.log(`[${appName}] Attempting reconnect...`);
-                  initSocket();
-                }
-              }, reconnectDelay);
-            }
-          }
-        };
-
-        socket.onerror = (error) => {
-          console.error(`[${appName}] WebSocket error:`, error);
-          if (mountedRef.current) {
-            setState((s) => ({ ...s, error: 'WebSocket connection error' }));
-          }
-        };
-
-        socket.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            const eventType = message.type || message.event;
-            const eventData = message.data || message.payload || message;
-
-            console.log(`[${appName}] Received event:`, eventType, eventData);
-
-            if (onEventRef.current && eventType) {
-              onEventRef.current(eventType as OrbitEventType, eventData);
-            }
-          } catch (parseError) {
-            console.error(`[${appName}] Failed to parse WebSocket message:`, parseError);
-          }
-        };
-
-        socketRef.current = socket;
-      } catch (error) {
-        console.error(`[${appName}] Failed to create WebSocket:`, error);
-        if (mountedRef.current) {
-          setState((s) => ({
-            ...s,
-            error: 'Failed to create WebSocket connection',
-            isRegistering: false,
-          }));
-        }
-      }
-    },
-    [appName, autoReconnect, reconnectDelay, enabled]
-  );
-
-  /**
-   * Initialize socket (register + connect)
+   * Initialize socket connection
    */
   const initSocket = useCallback(async () => {
-    const registration = await registerSession();
-    if (registration && mountedRef.current) {
-      connect(registration.websocketUrl, registration.socketSessionId);
+    // Check if already connected and reuse
+    if (socketService.isConnected() && socketService.getSessionId()) {
+      console.log(`[${appName}] Reusing existing socket connection:`, socketService.getSessionId());
+      if (mountedRef.current) {
+        setState({
+          connected: true,
+          sessionId: socketService.getSessionId(),
+          error: null,
+          isRegistering: false,
+        });
+      }
+      return;
     }
-  }, [registerSession, connect]);
+
+    setState((s) => ({ ...s, isRegistering: true, error: null }));
+
+    const config = await getSocketConfig();
+    if (!config || !mountedRef.current) {
+      return;
+    }
+
+    try {
+      console.log(`[${appName}] Connecting to socket...`);
+      const sessionId = await socketService.connect(config.socketUrl, config.lobId);
+
+      if (mountedRef.current) {
+        setState({
+          connected: true,
+          sessionId,
+          error: null,
+          isRegistering: false,
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Socket connection failed';
+      console.error(`[${appName}] Socket connection error:`, message);
+      if (mountedRef.current) {
+        setState((s) => ({
+          ...s,
+          connected: false,
+          error: message,
+          isRegistering: false,
+        }));
+      }
+    }
+  }, [appName, getSocketConfig]);
 
   /**
-   * Disconnect and cleanup
+   * Disconnect socket
    */
   const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    socketService.disconnect();
+    if (mountedRef.current) {
+      setState({
+        connected: false,
+        sessionId: null,
+        error: null,
+        isRegistering: false,
+      });
     }
-
-    if (socketRef.current) {
-      socketRef.current.close(1000, 'Client disconnect');
-      socketRef.current = null;
-    }
-
-    setState({
-      connected: false,
-      sessionId: null,
-      websocketUrl: null,
-      error: null,
-      isRegistering: false,
-    });
   }, []);
+
+  /**
+   * Reconnect socket
+   */
+  const reconnect = useCallback(async () => {
+    try {
+      setState((s) => ({ ...s, isRegistering: true, error: null }));
+      const sessionId = await socketService.reconnect();
+      if (mountedRef.current) {
+        setState({
+          connected: true,
+          sessionId,
+          error: null,
+          isRegistering: false,
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Reconnection failed';
+      if (mountedRef.current) {
+        setState((s) => ({
+          ...s,
+          connected: false,
+          error: message,
+          isRegistering: false,
+        }));
+      }
+    }
+  }, []);
+
+  // Subscribe to socket events
+  useEffect(() => {
+    if (!enabled) return;
+
+    const unsubscribeEvents = socketService.subscribe((eventType, data) => {
+      console.log(`[${appName}] Socket event:`, eventType, data);
+      if (onEventRef.current) {
+        onEventRef.current(eventType as OrbitEventType, data as OrbitEventData);
+      }
+    });
+
+    const unsubscribeStatus = socketService.onStatusChange((status: SocketConnectionStatus) => {
+      if (!mountedRef.current) return;
+
+      setState((s) => ({
+        ...s,
+        connected: status === 'connected',
+        sessionId: socketService.getSessionId(),
+        error: status === 'error' ? 'Socket connection error' : s.error,
+      }));
+    });
+
+    return () => {
+      unsubscribeEvents();
+      unsubscribeStatus();
+    };
+  }, [enabled, appName]);
 
   // Initialize on mount if enabled
   useEffect(() => {
@@ -277,23 +275,17 @@ export function useOrbitSocket({
 
     return () => {
       mountedRef.current = false;
-      disconnect();
+      // Don't disconnect on unmount - allow hybrid model where socket persists
     };
-  }, [enabled, initSocket, disconnect]);
+  }, [enabled, initSocket]);
 
   return {
     ...state,
     /** Manually reconnect */
-    reconnect: initSocket,
+    reconnect,
     /** Manually disconnect */
     disconnect,
-    /** Send a message through the WebSocket */
-    send: useCallback((data: unknown) => {
-      if (socketRef.current?.readyState === WebSocket.OPEN) {
-        socketRef.current.send(JSON.stringify(data));
-      } else {
-        console.warn(`[${appName}] Cannot send - WebSocket not connected`);
-      }
-    }, [appName]),
+    /** Get event log for debugging */
+    getEventLog: socketService.getEventLog.bind(socketService),
   };
 }
