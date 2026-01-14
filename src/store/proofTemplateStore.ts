@@ -199,12 +199,22 @@ export const useProofTemplateStore = create<ProofTemplateState>((set, get) => ({
   showJsonPreview: false,
   searchQuery: '',
 
-  // Template types - initialized with defaults
-  templateTypes: DEFAULT_PROOF_TEMPLATE_CATEGORIES.map((cat) => ({
-    id: cat.value,
-    name: cat.label,
-    isDefault: true,
-  })),
+  // Template types - load from localStorage or use defaults
+  templateTypes: (() => {
+    try {
+      const stored = localStorage.getItem('proofTemplateTypes');
+      if (stored) {
+        return JSON.parse(stored) as ProofTemplateType[];
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    // Return defaults if nothing stored
+    return DEFAULT_PROOF_TEMPLATE_CATEGORIES.map((cat) => ({
+      id: cat.value,
+      name: cat.label,
+    }));
+  })(),
 
   // Fetch all templates for current user
   fetchTemplates: async () => {
@@ -533,21 +543,15 @@ export const useProofTemplateStore = create<ProofTemplateState>((set, get) => ({
 
   // Template types actions
   fetchTemplateTypes: async () => {
-    // For now, use local storage to persist custom types
+    // Load types from localStorage
     try {
       const stored = localStorage.getItem('proofTemplateTypes');
       if (stored) {
-        const customTypes = JSON.parse(stored) as ProofTemplateType[];
-        // Merge with defaults
-        const defaults = DEFAULT_PROOF_TEMPLATE_CATEGORIES.map((cat) => ({
-          id: cat.value,
-          name: cat.label,
-          isDefault: true,
-        }));
-        set({ templateTypes: [...defaults, ...customTypes] });
+        const types = JSON.parse(stored) as ProofTemplateType[];
+        set({ templateTypes: types });
       }
     } catch {
-      // Ignore parse errors, use defaults
+      // Ignore parse errors, use current state
     }
   },
 
@@ -559,7 +563,7 @@ export const useProofTemplateStore = create<ProofTemplateState>((set, get) => ({
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-    const newType: ProofTemplateType = { id, name, isDefault: false };
+    const newType: ProofTemplateType = { id, name };
 
     set((state) => {
       // Check for duplicates
@@ -568,9 +572,8 @@ export const useProofTemplateStore = create<ProofTemplateState>((set, get) => ({
       }
 
       const updatedTypes = [...state.templateTypes, newType];
-      // Save custom types to localStorage
-      const customTypes = updatedTypes.filter((t) => !t.isDefault);
-      localStorage.setItem('proofTemplateTypes', JSON.stringify(customTypes));
+      // Save all types to localStorage
+      localStorage.setItem('proofTemplateTypes', JSON.stringify(updatedTypes));
 
       return { templateTypes: updatedTypes };
     });
@@ -578,16 +581,9 @@ export const useProofTemplateStore = create<ProofTemplateState>((set, get) => ({
 
   deleteTemplateType: async (id: string) => {
     set((state) => {
-      // Don't allow deleting default types
-      const typeToDelete = state.templateTypes.find((t) => t.id === id);
-      if (!typeToDelete || typeToDelete.isDefault) {
-        return state;
-      }
-
       const updatedTypes = state.templateTypes.filter((t) => t.id !== id);
-      // Save custom types to localStorage
-      const customTypes = updatedTypes.filter((t) => !t.isDefault);
-      localStorage.setItem('proofTemplateTypes', JSON.stringify(customTypes));
+      // Save all types to localStorage
+      localStorage.setItem('proofTemplateTypes', JSON.stringify(updatedTypes));
 
       return { templateTypes: updatedTypes };
     });

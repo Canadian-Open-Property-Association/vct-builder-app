@@ -362,7 +362,6 @@ export const DEFAULT_PROOF_TEMPLATE_CATEGORIES = [
 export interface ProofTemplateType {
   id: string;
   name: string;
-  isDefault?: boolean;
 }
 
 // For backwards compatibility
