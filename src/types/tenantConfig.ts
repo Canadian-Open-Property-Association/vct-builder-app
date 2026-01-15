@@ -106,6 +106,7 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
       'data-dictionary',
       'data-harmonization',
       'test-issuer',
+      'test-verifier',
       'credential-catalogue',
       'settings',
     ],
@@ -185,6 +186,12 @@ export const AVAILABLE_APPS: ReadonlyArray<{
     id: 'credential-catalogue',
     name: 'Credential Catalogue',
     description: 'Import external credentials for verification',
+    category: 'testing',
+  },
+  {
+    id: 'test-verifier',
+    name: 'Test Verifier',
+    description: 'Verify credentials with proof requests',
     category: 'testing',
   },
 ];
