@@ -154,14 +154,13 @@ export async function initializeDatabase() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(255) NOT NULL,
         description TEXT,
-        purpose TEXT,
-        claims JSONB NOT NULL DEFAULT '[]',
-        format VARCHAR(50) NOT NULL DEFAULT 'presentation-exchange',
-        category VARCHAR(100) DEFAULT 'general',
         version VARCHAR(50) DEFAULT '1.0.0',
-        tags JSONB DEFAULT '[]',
+        credential_format VARCHAR(50) NOT NULL DEFAULT 'anoncreds',
+        requested_credentials JSONB NOT NULL DEFAULT '[]',
+        metadata JSONB DEFAULT '{}',
         status VARCHAR(20) NOT NULL DEFAULT 'draft',
         vdr_uri VARCHAR(500),
+        published_to_verifier BOOLEAN NOT NULL DEFAULT false,
         author_name VARCHAR(255),
         author_email VARCHAR(255),
         github_user_id VARCHAR(255),
@@ -174,7 +173,36 @@ export async function initializeDatabase() {
 
       CREATE INDEX IF NOT EXISTS idx_proof_templates_github_user ON proof_templates(github_user_id);
       CREATE INDEX IF NOT EXISTS idx_proof_templates_status ON proof_templates(status);
-      CREATE INDEX IF NOT EXISTS idx_proof_templates_category ON proof_templates(category);
+      CREATE INDEX IF NOT EXISTS idx_proof_templates_credential_format ON proof_templates(credential_format);
+      CREATE INDEX IF NOT EXISTS idx_proof_templates_published_to_verifier ON proof_templates(published_to_verifier);
+
+      -- Migration: Add new columns to existing proof_templates table if they don't exist
+      DO $$
+      BEGIN
+        -- Add credential_format column if it doesn't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'proof_templates' AND column_name = 'credential_format') THEN
+          ALTER TABLE proof_templates ADD COLUMN credential_format VARCHAR(50) NOT NULL DEFAULT 'anoncreds';
+        END IF;
+
+        -- Add requested_credentials column if it doesn't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'proof_templates' AND column_name = 'requested_credentials') THEN
+          ALTER TABLE proof_templates ADD COLUMN requested_credentials JSONB NOT NULL DEFAULT '[]';
+        END IF;
+
+        -- Add metadata column if it doesn't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'proof_templates' AND column_name = 'metadata') THEN
+          ALTER TABLE proof_templates ADD COLUMN metadata JSONB DEFAULT '{}';
+        END IF;
+
+        -- Add published_to_verifier column if it doesn't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'proof_templates' AND column_name = 'published_to_verifier') THEN
+          ALTER TABLE proof_templates ADD COLUMN published_to_verifier BOOLEAN NOT NULL DEFAULT false;
+        END IF;
+      END $$;
     `);
 
     console.log('Forms Builder: Database tables initialized');
